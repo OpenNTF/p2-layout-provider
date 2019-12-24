@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import javax.enterprise.context.ApplicationScoped;
+import javax.enterprise.inject.Produces;
 import javax.inject.Named;
 
 import org.openntf.maven.p2proxy.Storage;
@@ -30,6 +31,7 @@ import model.P2Repository;
 public class RepositoriesBean {
 	private List<P2Repository> repositories = Storage.loadRepositories();
 	
+	@Produces
 	public List<P2Repository> getRepositories() {
 		return repositories;
 	}

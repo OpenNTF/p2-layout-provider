@@ -106,6 +106,17 @@
 			<groupId>javax.mvc</groupId>
 			<artifactId>javax.mvc-api</artifactId>
 		</dependency>
+
+		<dependency>
+			<groupId>com.ibm.sbt</groupId>
+			<artifactId>com.ibm.commons.xml</artifactId>
+			<version>9.0.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.ibm.sbt</groupId>
+			<artifactId>com.ibm.commons</artifactId>
+			<version>9.0.0</version>
+		</dependency>
 			
 		<dependency>
 			<groupId>org.projectlombok</groupId>

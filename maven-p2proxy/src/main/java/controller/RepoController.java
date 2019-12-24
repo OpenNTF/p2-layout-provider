@@ -1,0 +1,106 @@
+package controller;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.util.List;
+import java.util.jar.JarInputStream;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import javax.inject.Inject;
+import javax.ws.rs.GET;
+import javax.ws.rs.NotFoundException;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.StreamingOutput;
+import javax.ws.rs.core.UriInfo;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+
+import com.ibm.commons.util.PathUtil;
+import com.ibm.commons.util.io.StreamUtil;
+import com.ibm.commons.xml.DOMUtil;
+import com.ibm.commons.xml.XMLException;
+
+import model.P2Repository;
+
+@Path(RepoController.PATH)
+public class RepoController {
+	public static final String PATH = "repo"; //$NON-NLS-1$
+	
+	@Inject
+	private List<P2Repository> repositories;
+	
+	@GET
+	@Path("{groupId}")
+	@Produces(MediaType.TEXT_PLAIN)
+	public String get(@PathParam("groupId") String groupId) throws MalformedURLException, IOException, XMLException {
+		
+		P2Repository repo = repositories.stream()
+			.filter(r -> r.getGroupId().equals(groupId))
+			.findFirst()
+			.orElseThrow(() -> new NotFoundException("Could not find repo with group ID " + groupId));
+		
+		URI artifactsJar = URI.create(PathUtil.concat(repo.getUri().toString(), "artifacts.jar", '/')); //$NON-NLS-1$
+		
+		Document xml;
+		try(InputStream is = artifactsJar.toURL().openStream()) {
+			try(JarInputStream jis = new JarInputStream(is)) {
+				jis.getNextEntry();
+				xml = DOMUtil.createDocument(jis);
+			}
+		}
+		
+		Object[] artifacts = DOMUtil.nodes(xml, "/repository/artifacts/artifact"); //$NON-NLS-1$
+		return Stream.of(artifacts)
+			.map(Element.class::cast)
+			.map(artifact -> {
+				// TODO consider using properties/property[@name="maven-artifactId"] et al
+				String id = artifact.getAttribute("id");
+				String version = artifact.getAttribute("version");
+				
+				return id + ":" + version;
+			})
+			.collect(Collectors.joining("\n"));
+	}
+	
+	@GET
+	@Path("{groupId}/{artifactId}/{version}/{artifact}")
+	@Produces("application/x-java-archive")
+	public StreamingOutput getArtifact(@PathParam("groupId") String groupId, @PathParam("artifactId") String artifactId, @PathParam("version") String version, @PathParam("artifact") String artifact) throws MalformedURLException, IOException {
+		P2Repository repo = repositories.stream()
+				.filter(r -> r.getGroupId().equals(groupId))
+				.findFirst()
+				.orElseThrow(() -> new NotFoundException("Could not find repo with group ID " + groupId));
+
+		String plugins = PathUtil.concat(repo.getUri().toString(), "plugins", '/'); //$NON-NLS-1$
+		String artifactUrl = PathUtil.concat(plugins, artifactId + "_" + version + ".jar", '/'); //$NON-NLS-1$ //$NON-NLS-2$
+		URI url = URI.create(artifactUrl);
+		
+		return out -> {
+			try(InputStream is = url.toURL().openStream()) {
+				StreamUtil.copyStream(is, out);
+			}
+		};
+	}
+	
+	@GET
+	@Path("{s:.*}/maven-metadata.xml")
+	@Produces(MediaType.TEXT_XML)
+	public String getMetadata(@Context UriInfo uriInfo) {
+		String path = uriInfo.getPath().substring(PATH.length());
+		String basePath = path.startsWith("/") ? path.substring(1) : path; //$NON-NLS-1$
+		
+		return repositories.stream()
+			.map(P2Repository::getGroupId)
+			.map(groupId -> groupId.replace('.', '/'))
+			.filter(groupPath -> basePath.isEmpty() || groupPath.startsWith(basePath + "/")) //$NON-NLS-1$
+			.collect(Collectors.joining("\n")); //$NON-NLS-1$
+	}
+}
