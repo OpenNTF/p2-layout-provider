@@ -62,12 +62,12 @@ public class RepoController {
 			.map(Element.class::cast)
 			.map(artifact -> {
 				// TODO consider using properties/property[@name="maven-artifactId"] et al
-				String id = artifact.getAttribute("id");
-				String version = artifact.getAttribute("version");
+				String id = artifact.getAttribute("id"); //$NON-NLS-1$
+				String version = artifact.getAttribute("version"); //$NON-NLS-1$
 				
-				return id + ":" + version;
+				return id + ":" + version; //$NON-NLS-1$
 			})
-			.collect(Collectors.joining("\n"));
+			.collect(Collectors.joining("\n")); //$NON-NLS-1$
 	}
 	
 	@GET
