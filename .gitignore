@@ -1,0 +1,13 @@
+.DS_Store*
+ehthumbs.db
+Icon?
+Thumbs.db
+*.swp
+
+.vscode/
+.settings/
+.project
+.classpath
+
+.idea/
+*.iml

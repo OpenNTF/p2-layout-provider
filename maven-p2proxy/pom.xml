@@ -1,0 +1,189 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>org.openntf.maven</groupId>
+	<artifactId>maven-p2proxy</artifactId>
+	<version>1.0.0-SNAPSHOT</version>
+	<packaging>war</packaging>
+	
+	<inceptionYear>2019</inceptionYear>
+
+	<licenses>
+		<license>
+			<name>The Apache Software License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<name>Jesse Gallagher</name>
+			<email>jesse@frostillic.us</email>
+		</developer>
+	</developers>
+
+	<properties>
+		<failOnMissingWebXml>false</failOnMissingWebXml>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<failOnMissingWebXml>false</failOnMissingWebXml>
+	</properties>
+	
+	<pluginRepositories>
+		<pluginRepository>
+			<id>artifactory.openntf.org</id>
+			<name>artifactory.openntf.org</name>
+			<url>https://artifactory.openntf.org/openntf</url>
+		</pluginRepository>
+	</pluginRepositories>
+	
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>jakarta.platform</groupId>
+				<artifactId>jakarta.jakartaee-bom</artifactId>
+				<version>8.0.0</version>
+				<scope>import</scope>
+				<type>pom</type>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.microprofile</groupId>
+				<artifactId>microprofile</artifactId>
+				<version>3.1</version>
+				<scope>import</scope>
+				<type>pom</type>
+			</dependency>
+			
+			<dependency>
+				<groupId>javax.mvc</groupId>
+				<artifactId>javax.mvc-api</artifactId>
+				<version>1.0-pfd</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.krazo</groupId>
+				<artifactId>krazo-core</artifactId>
+				<version>1.0.0-Beta1</version>
+			</dependency>
+			<dependency>
+				<groupId>org.eclipse.krazo</groupId>
+				<artifactId>krazo-cxf</artifactId>
+				<version>1.0.0-Beta1</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+	
+	<dependencies>
+		<dependency>
+			<groupId>jakarta.servlet</groupId>
+			<artifactId>jakarta.servlet-api</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.enterprise</groupId>
+			<artifactId>jakarta.enterprise.cdi-api</artifactId>
+			<scope>provided</scope>
+		</dependency>
+        <dependency>
+			<groupId>jakarta.ws.rs</groupId>
+			<artifactId>jakarta.ws.rs-api</artifactId>
+			<scope>provided</scope>
+        </dependency>
+		<dependency>
+			<groupId>jakarta.validation</groupId>
+			<artifactId>jakarta.validation-api</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.json.bind</groupId>
+			<artifactId>jakarta.json.bind-api</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		
+		<dependency>
+			<groupId>javax.mvc</groupId>
+			<artifactId>javax.mvc-api</artifactId>
+		</dependency>
+			
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<version>1.18.10</version>
+			<scope>provided</scope>
+		</dependency>
+	</dependencies>
+	
+	<build>
+		<finalName>p2proxy</finalName>
+	
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-assembly-plugin</artifactId>
+					<version>3.1.0</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-war-plugin</artifactId>
+					<version>3.2.3</version>
+				</plugin>
+			
+				<plugin>
+					<groupId>com.mycila</groupId>
+					<artifactId>license-maven-plugin</artifactId>
+					<version>3.0</version>
+					<configuration>
+						<aggregate>true</aggregate>
+						<header>license.txt</header>
+						<excludes>
+							<exclude>**/pom.xml</exclude>
+				            <exclude>**/README</exclude>
+				            <exclude>src/test/resources/**</exclude>
+				            <exclude>src/main/resources/**</exclude>
+				            <exclude>**/odp/**</exclude>
+						</excludes>
+						<properties>
+							<owner>Jesse Gallagher</owner>
+							<copyrightYear>2019</copyrightYear>
+						</properties>
+						<mapping>
+							<tag>DYNASCRIPT_STYLE</tag>
+						</mapping>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+	
+	<profiles>
+		<profile>
+			<id>jee-container</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			
+			<dependencies>
+				<dependency>
+					<groupId>org.eclipse.krazo</groupId>
+					<artifactId>krazo-core</artifactId>
+				</dependency>
+			</dependencies>
+		</profile>
+		<profile>
+			<id>cxf</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			
+			<dependencies>
+				<dependency>
+					<groupId>org.eclipse.krazo</groupId>
+					<artifactId>krazo-cxf</artifactId>
+				</dependency>
+			</dependencies>
+		</profile>
+	</profiles>
+</project>
