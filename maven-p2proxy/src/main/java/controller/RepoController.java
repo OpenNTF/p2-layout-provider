@@ -71,6 +71,41 @@ public class RepoController {
 	}
 	
 	@GET
+	@Path("{groupId}/{artifactId}/maven-metadata.xml")
+	@Produces(MediaType.TEXT_XML)
+	public Document getArtifactMetadata(@PathParam("groupId") String groupId, @PathParam("artifactId") String artifactId) throws MalformedURLException, IOException, XMLException {
+		
+		P2Repository repo = repositories.stream()
+			.filter(r -> r.getGroupId().equals(groupId))
+			.findFirst()
+			.orElseThrow(() -> new NotFoundException("Could not find repo with group ID " + groupId));
+		
+		URI artifactsJar = URI.create(PathUtil.concat(repo.getUri().toString(), "artifacts.jar", '/')); //$NON-NLS-1$
+		
+		Document xml;
+		try(InputStream is = artifactsJar.toURL().openStream()) {
+			try(JarInputStream jis = new JarInputStream(is)) {
+				jis.getNextEntry();
+				xml = DOMUtil.createDocument(jis);
+			}
+		}
+		
+		Element artifact = (Element)DOMUtil.node(xml, "/repository/artifacts/artifact[@id=\"" + artifactId + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
+		String version = artifact.getAttribute("version"); //$NON-NLS-1$
+		
+		Document result = DOMUtil.createDocument();
+		Element metadata = DOMUtil.createElement(result, "metadata"); //$NON-NLS-1$
+		DOMUtil.createElement(result, metadata, "groupId").setTextContent(groupId); //$NON-NLS-1$
+		DOMUtil.createElement(result, metadata, "artifactId").setTextContent(artifactId); //$NON-NLS-1$
+		Element versioning = DOMUtil.createElement(result, metadata, "versioning"); //$NON-NLS-1$
+		DOMUtil.createElement(result, versioning, "latest").setTextContent(version); //$NON-NLS-1$
+		DOMUtil.createElement(result, versioning, "release").setTextContent(version); //$NON-NLS-1$
+		Element versions = DOMUtil.createElement(result, versioning, "versions"); //$NON-NLS-1$
+		DOMUtil.createElement(result, versions, "version").setTextContent(version); //$NON-NLS-1$
+		return result;
+	}
+	
+	@GET
 	@Path("{groupId}/{artifactId}/{version}/{artifact}.pom")
 	@Produces(MediaType.TEXT_XML)
 	public Document getArtifactPom(@PathParam("groupId") String groupId, @PathParam("artifactId") String artifactId, @PathParam("version") String version, @PathParam("artifact") String artifact) throws XMLException {
