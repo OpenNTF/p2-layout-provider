@@ -71,6 +71,20 @@ public class RepoController {
 	}
 	
 	@GET
+	@Path("{groupId}/{artifactId}/{version}/{artifact}.pom")
+	@Produces(MediaType.TEXT_XML)
+	public Document getArtifactPom(@PathParam("groupId") String groupId, @PathParam("artifactId") String artifactId, @PathParam("version") String version, @PathParam("artifact") String artifact) throws XMLException {
+		Document xml = DOMUtil.createDocument();
+		Element project = DOMUtil.createElement(xml, "project"); //$NON-NLS-1$
+		DOMUtil.createElement(xml, project, "modelVersion").setTextContent("4.0.0"); //$NON-NLS-1$ //$NON-NLS-2$
+		DOMUtil.createElement(xml, project, "groupId").setTextContent(groupId); //$NON-NLS-1$
+		DOMUtil.createElement(xml, project, "artifactId").setTextContent(artifactId); //$NON-NLS-1$
+		DOMUtil.createElement(xml, project, "name").setTextContent(artifactId); //$NON-NLS-1$
+		DOMUtil.createElement(xml, project, "version").setTextContent(version); //$NON-NLS-1$
+		return xml;
+	}
+	
+	@GET
 	@Path("{groupId}/{artifactId}/{version}/{artifact}")
 	@Produces("application/x-java-archive")
 	public StreamingOutput getArtifact(@PathParam("groupId") String groupId, @PathParam("artifactId") String artifactId, @PathParam("version") String version, @PathParam("artifact") String artifact) throws MalformedURLException, IOException {
