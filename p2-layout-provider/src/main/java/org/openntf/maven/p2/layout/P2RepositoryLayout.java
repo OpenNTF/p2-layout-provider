@@ -32,9 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.jar.JarInputStream;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -44,6 +42,7 @@ import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
 import org.eclipse.aether.spi.log.Logger;
 import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.model.P2Bundle;
+import org.openntf.maven.p2.model.P2Repository;
 import org.osgi.framework.Version;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -59,9 +58,8 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 
 	private String id;
 	private String url;
+	private final P2Repository p2Repo;
 	private Path metadataScratch;
-	private List<P2Bundle> bundles;
-	private boolean checkedArtifacts;
 	
 	private Map<String, Path> poms = new HashMap<>();
 	private Map<String, Path> metadatas = new HashMap<>();
@@ -72,6 +70,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		this.id = id;
 		this.url = url;
 		this.log = log;
+		this.p2Repo = new P2Repository(URI.create(url));
 		this.metadataScratch = Files.createTempDirectory(getClass().getName() + '-' + id + "-metadata"); //$NON-NLS-1$
 	}
 
@@ -294,13 +293,13 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	}
 	
 	private List<P2Bundle> findBundles(String artifactId) throws XMLException {
-		return getBundles().stream()
+		return this.p2Repo.getBundles().stream()
 			.filter(bundle -> StringUtil.equals(bundle.getId(), artifactId))
 			.collect(Collectors.toList());
 	}
 	
 	private Optional<P2Bundle> findBundle(String artifactId, String version) throws XMLException {
-		return getBundles().stream()
+		return this.p2Repo.getBundles().stream()
 			.filter(bundle -> StringUtil.equals(bundle.getId(), artifactId))
 			.filter(bundle -> version == null || version.equals(bundle.getVersion()))
 			.findFirst();
@@ -341,38 +340,4 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		builder.append(artifact.getExtension());
 		return builder.toString();
 	}
-	
-	private synchronized List<P2Bundle> getBundles() {
-		if(!checkedArtifacts) {
-			this.checkedArtifacts = true;
-			if(this.bundles == null) {
-				URI artifactsJar = URI.create(PathUtil.concat(this.url, "artifacts.jar", '/')); //$NON-NLS-1$
-				
-				try {
-					Document xml;
-					try(InputStream is = artifactsJar.toURL().openStream()) {
-						try(JarInputStream jis = new JarInputStream(is)) {
-							jis.getNextEntry();
-							xml = DOMUtil.createDocument(jis);
-						}
-					}
-					this.bundles = Stream.of(DOMUtil.nodes(xml, "/repository/artifacts/artifact[@classifier=\"osgi.bundle\"]")) //$NON-NLS-1$
-						.map(Element.class::cast)
-						.filter(el -> {
-							try {
-								return DOMUtil.nodes(el, "processing").length == 0; //$NON-NLS-1$
-							} catch (XMLException e) {
-								throw new RuntimeException(e);
-							}
-						})
-						.map(P2Bundle::new)
-						.collect(Collectors.toList());
-				} catch(IOException | XMLException e) {
-					throw new RuntimeException(e);
-				}
-			}
-		}
-		return this.bundles;
-	}
-
 }
