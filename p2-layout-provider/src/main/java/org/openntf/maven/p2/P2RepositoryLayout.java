@@ -42,6 +42,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import com.ibm.commons.util.PathUtil;
+import com.ibm.commons.util.StringUtil;
 import com.ibm.commons.xml.DOMUtil;
 import com.ibm.commons.xml.Format;
 import com.ibm.commons.xml.XMLException;
@@ -77,9 +78,32 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			return getPom(artifact).toUri();
 		}
 		case "jar": { //$NON-NLS-1$
-			String jar = artifact.getArtifactId() + "_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$
-			String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
-			return URI.create(url);
+			// Check for classifier
+			switch(StringUtil.toString(artifact.getClassifier())) {
+			case "sources": { //$NON-NLS-1$
+				String jar = artifact.getArtifactId() + ".source_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$
+				String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
+				return URI.create(url);
+			}
+			case "javadoc": { //$NON-NLS-1$
+				// TODO determine if there's a true standard to follow here
+				String jar = artifact.getArtifactId() + ".javadoc_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$
+				String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
+				return URI.create(url);
+			}
+			case "": { //$NON-NLS-1$
+				// Then it's just the jar
+				String jar = artifact.getArtifactId() + "_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$
+				String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
+				return URI.create(url);
+			}
+			default: {
+				// TODO search inside Jar for embeds
+				String jar = artifact.getArtifactId() + "." + artifact.getClassifier() + "_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+				String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
+				return URI.create(url);
+			}
+			}
 		}
 		}
 		
@@ -256,7 +280,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	}
 	
 	private List<Element> findArtifactNodes(Document xml, String artifactId) throws XMLException {
-		Object[] nodes = DOMUtil.nodes(xml, "/repository/artifacts/artifact[@id=\"" + artifactId + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
+		Object[] nodes = DOMUtil.nodes(xml, "/repository/artifacts/artifact[@classifier=\"osgi.bundle\"][@id=\"" + artifactId + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
 		// Filter out any with a "processing" child
 		return Stream.of(nodes)
 			.map(Element.class::cast)
