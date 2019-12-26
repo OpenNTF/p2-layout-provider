@@ -15,6 +15,7 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 	<version>0.0.1-SNAPSHOT</version>
 	
 	<pluginRepositories>
+		<!-- the plugin is hosted in OpenNTF's Maven repository -->
 		<pluginRepository>
 			<id>artifactory.openntf.org</id>
 			<name>artifactory.openntf.org</name>
@@ -24,7 +25,7 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 
 	<repositories>
 		<repository>
-			<id>org.eclipse.p2.repo</id>
+			<id>org.eclipse.p2.repo</id>   <!-- defines the groupId to be used below -->
 			<url>http://download.eclipse.org/releases/2019-12/201912181000</url>
 			<layout>p2</layout>
 		</repository>
@@ -32,7 +33,7 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 
 	<dependencies>
 		<dependency>
-			<groupId>org.eclipse.p2.repo</groupId>
+			<groupId>org.eclipse.p2.repo</groupId>   <!-- matches id of the repo above -->
 			<artifactId>ch.qos.logback.slf4j</artifactId>
 			<version>1.1.2.v20160301-0943</version>
 		</dependency>
