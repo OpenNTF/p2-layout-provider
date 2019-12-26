@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collection;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.spi.connector.ArtifactDownload;
@@ -33,6 +34,9 @@ import org.eclipse.aether.spi.connector.MetadataUpload;
 import org.eclipse.aether.spi.connector.RepositoryConnector;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout.Checksum;
 import org.eclipse.aether.spi.log.Logger;
+import org.eclipse.aether.transfer.ChecksumFailureException;
+
+import com.ibm.commons.util.StringUtil;
 
 public class P2RepositoryConnector implements RepositoryConnector {
 	private final Logger log;
@@ -69,10 +73,16 @@ public class P2RepositoryConnector implements RepositoryConnector {
 				download(sourceUri, dest);
 				
 				// TODO verify using downloaded checksums
-				for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, null)) {
+				for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, sourceUri)) {
 					String ext = checksum.getAlgorithm().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
 					Path checksumPath = dest.getParent().resolve(dest.getFileName().toString()+"."+ext); //$NON-NLS-1$
-					download(checksum.getLocation(), checksumPath);
+					download(sourceUri.resolve(checksum.getLocation()), checksumPath);
+					
+					try {
+						verifyChecksum(dest, checksumPath, checksum.getAlgorithm());
+					} catch (ChecksumFailureException e) {
+						throw new RuntimeException(e);
+					}
 				}
 			}
 		}
@@ -114,6 +124,19 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
 		} catch(FileNotFoundException e) {
 			// Ignore
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private void verifyChecksum(Path artifactPath, Path checksumPath, String algorithm) throws ChecksumFailureException {
+		try {
+			String checksum = new String(Files.readAllBytes(checksumPath));
+			DigestUtils digest = new DigestUtils(algorithm);
+			String fileChecksum = digest.digestAsHex(artifactPath.toFile());
+			if(!StringUtil.equals(checksum, fileChecksum)) {
+				throw new ChecksumFailureException("Checksum for " + artifactPath + "does not match expected " + algorithm + " value " + checksum);
+			}
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}

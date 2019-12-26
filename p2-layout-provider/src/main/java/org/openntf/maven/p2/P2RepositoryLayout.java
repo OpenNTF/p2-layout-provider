@@ -16,19 +16,21 @@
 package org.openntf.maven.p2;
 
 import java.io.Closeable;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.jar.JarInputStream;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -59,6 +61,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private Map<Artifact, Path> poms = new HashMap<>();
 	private Map<String, Path> metadatas = new HashMap<>();
 	private Map<Artifact, List<Checksum>> checksums = new HashMap<>();
+	private Map<Artifact, Path> localJars = new HashMap<>();
 
 	public P2RepositoryLayout(String id, String url, Logger log) throws IOException {
 		this.id = id;
@@ -93,9 +96,9 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			}
 			case "": { //$NON-NLS-1$
 				// Then it's just the jar
-				String jar = artifact.getArtifactId() + "_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$
-				String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
-				return URI.create(url);
+				return getLocalJar(artifact)
+					.map(Path::toUri)
+					.orElse(fakeUri());
 			}
 			default: {
 				// TODO search inside Jar for embeds
@@ -121,42 +124,38 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 
 	@Override
 	public List<Checksum> getChecksums(Artifact artifact, boolean upload, URI location) {
-		// This implementation doesn't currently work, as it runs afoul of Checksum's constructor's requirement
-		//   that the URI must be relative. That will mean that we'll have to pre-download the Jar, which is
-		//   a bit of a shame
-//		return this.checksums.computeIfAbsent(artifact, key -> {
-//			if("pom".equals(key.getExtension())) { //$NON-NLS-1$
-//				return Collections.emptyList();
-//			}
-//			
-//			Document artifactsXml = getArtifactsXml();
-//			if(artifactsXml != null) {
-//				try {
-//					Element artifactNode = findArtifactNode(artifactsXml, artifact.getArtifactId(), artifact.getVersion());
-//					if(artifactNode != null) {
-//						return Stream.of(DOMUtil.nodes(artifactNode, "properties/property")) //$NON-NLS-1$
-//							.map(Element.class::cast)
-//							.filter(property -> String.valueOf(property.getAttribute("name")).startsWith("download.checksum.")) //$NON-NLS-1$ //$NON-NLS-2$
-//							.map(property -> {
-//								try {
-//									String algorithm = property.getAttribute("name").substring("download.checksum.".length()); //$NON-NLS-1$ //$NON-NLS-2$
-//									String value = property.getAttribute("value"); //$NON-NLS-1$
-//									Path checksumFile = metadataScratch.resolve(key.getArtifactId() + "-" + key.getVersion() + "-" + key.getClassifier() + "." + algorithm); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-//									Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-//									return new Checksum(algorithm, checksumFile.toUri());
-//								} catch(IOException e) {
-//									throw new RuntimeException(e);
-//								}
-//							})
-//							.collect(Collectors.toList());
-//					}
-//				} catch(XMLException e) {
-//					throw new RuntimeException(e);
-//				}
-//			}
-//			return Collections.emptyList();
-//		});
-		return Collections.emptyList();
+		return this.checksums.computeIfAbsent(artifact, key -> {
+			if("pom".equals(key.getExtension()) || StringUtil.isNotEmpty(artifact.getClassifier())) { //$NON-NLS-1$
+				return Collections.emptyList();
+			}
+			
+			Document artifactsXml = getArtifactsXml();
+			if(artifactsXml != null) {
+				try {
+					Element artifactNode = findArtifactNode(artifactsXml, artifact.getArtifactId(), artifact.getVersion());
+					if(artifactNode != null) {
+						return Stream.of(DOMUtil.nodes(artifactNode, "properties/property")) //$NON-NLS-1$
+							.map(Element.class::cast)
+							.filter(property -> String.valueOf(property.getAttribute("name")).startsWith("download.checksum.")) //$NON-NLS-1$ //$NON-NLS-2$
+							.map(property -> {
+								try {
+									String algorithm = property.getAttribute("name").substring("download.checksum.".length()); //$NON-NLS-1$ //$NON-NLS-2$
+									String value = property.getAttribute("value"); //$NON-NLS-1$
+									Path checksumFile = metadataScratch.resolve(toFileName(artifact) + "." + algorithm); //$NON-NLS-1$
+									Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+									return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
+								} catch(IOException e) {
+									throw new RuntimeException(e);
+								}
+							})
+							.collect(Collectors.toList());
+					}
+				} catch(XMLException e) {
+					throw new RuntimeException(e);
+				}
+			}
+			return Collections.emptyList();
+		});
 	}
 
 	@Override
@@ -180,10 +179,19 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				// Ignore
 			}
 		}
+		for(Path path : localJars.values()) {
+			if(path != null) {
+				try {
+					Files.deleteIfExists(path);
+				} catch (IOException e) {
+					// Ignore
+				}
+			}
+		}
 		for(List<Checksum> cks : checksums.values()) {
 			for(Checksum checksum : cks) {
 				try {
-					Path path = Paths.get(checksum.getLocation());
+					Path path = this.metadataScratch.resolve(checksum.getLocation().toString());
 					Files.deleteIfExists(path);
 				} catch (IOException e) {
 					// Ignore
@@ -200,6 +208,10 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	// *******************************************************************************
 	// * Internal implementation methods
 	// *******************************************************************************
+	
+	private URI fakeUri() {
+		return this.metadataScratch.resolve(Long.toString(System.nanoTime())).toUri();
+	}
 	
 	private Path getPom(Artifact artifact) {
 		return this.poms.computeIfAbsent(artifact, key -> {
@@ -298,6 +310,42 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		List<Element> nodes = findArtifactNodes(xml, artifactId);
 		// TODO filter to version
 		return nodes.isEmpty() ? null : nodes.get(0);
+	}
+	
+	private Optional<Path> getLocalJar(Artifact artifact) {
+		return Optional.ofNullable(localJars.computeIfAbsent(artifact, key -> {
+			String jar = toFileName(artifact);
+			String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
+			URI uri = URI.create(url);
+			try(InputStream is = uri.toURL().openStream()) {
+				Path localJar = this.metadataScratch.resolve(jar);
+				Files.copy(is, localJar, StandardCopyOption.REPLACE_EXISTING);
+				return localJar;
+			} catch(FileNotFoundException e) {
+				// 404
+				return null;
+			} catch(IOException e) {
+				throw new RuntimeException(e);
+			}
+		}));
+	}
+	
+	private String toFileName(Artifact artifact) {
+		StringBuilder builder = new StringBuilder();
+		builder.append(artifact.getArtifactId());
+		if(StringUtil.isNotEmpty(artifact.getClassifier())) {
+			builder.append("."); //$NON-NLS-1$
+			if("sources".equals(artifact.getClassifier())) { //$NON-NLS-1$
+				builder.append("source"); //$NON-NLS-1$
+			} else {
+				builder.append(artifact.getClassifier());
+			}
+		}
+		builder.append('_');
+		builder.append(artifact.getVersion());
+		builder.append('.');
+		builder.append(artifact.getExtension());
+		return builder.toString();
 	}
 	
 	private synchronized Document getArtifactsXml() {
