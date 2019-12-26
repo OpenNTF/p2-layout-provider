@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.metadata.Metadata;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
 import org.eclipse.aether.spi.log.Logger;
+import org.osgi.framework.Version;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -214,20 +216,31 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				if(artifactsXml != null) {
 					// Create a temporary maven-metadata.xml
 					try {
-						// TODO support 
-						Element artifactNode = findArtifactNode(artifactsXml, metadata.getArtifactId(), null);
-						if(artifactNode != null) {
-							String version = artifactNode.getAttribute("version"); //$NON-NLS-1$
+						List<Element> artifactNodes = findArtifactNodes(artifactsXml, metadata.getArtifactId());
+						if(!artifactNodes.isEmpty()) {
 							
 							Document result = DOMUtil.createDocument();
 							Element metadataNode = DOMUtil.createElement(result, "metadata"); //$NON-NLS-1$
 							DOMUtil.createElement(result, metadataNode, "groupId").setTextContent(this.id); //$NON-NLS-1$
 							DOMUtil.createElement(result, metadataNode, "artifactId").setTextContent(metadata.getArtifactId()); //$NON-NLS-1$
 							Element versioning = DOMUtil.createElement(result, metadataNode, "versioning"); //$NON-NLS-1$
-							DOMUtil.createElement(result, versioning, "latest").setTextContent(version); //$NON-NLS-1$
-							DOMUtil.createElement(result, versioning, "release").setTextContent(version); //$NON-NLS-1$
 							Element versions = DOMUtil.createElement(result, versioning, "versions"); //$NON-NLS-1$
-							DOMUtil.createElement(result, versions, "version").setTextContent(version); //$NON-NLS-1$
+
+							for(Element artifactNode : artifactNodes) {
+								String version = artifactNode.getAttribute("version"); //$NON-NLS-1$
+								DOMUtil.createElement(result, versions, "version").setTextContent(version); //$NON-NLS-1$
+							}
+							
+							// Just assume that the last one by string comparison is the newest for now
+							String latestVersion = artifactNodes.stream()
+								.map(el -> el.getAttribute("version")) //$NON-NLS-1$
+								.map(Version::new)
+								.sorted(Comparator.reverseOrder())
+								.map(String::valueOf)
+								.findFirst()
+								.orElse(null);
+							DOMUtil.createElement(result, versioning, "latest").setTextContent(latestVersion); //$NON-NLS-1$
+							DOMUtil.createElement(result, versioning, "release").setTextContent(latestVersion); //$NON-NLS-1$
 							
 							try(OutputStream os = Files.newOutputStream(metadataOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 								DOMUtil.serialize(os, result, Format.defaultFormat);

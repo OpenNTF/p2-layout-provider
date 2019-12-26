@@ -68,6 +68,11 @@
 			<artifactId>com.ibm.commons.xml</artifactId>
 			<version>9.0.0</version>
 		</dependency>
+		<dependency>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.framework</artifactId>
+			<version>1.9.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>
