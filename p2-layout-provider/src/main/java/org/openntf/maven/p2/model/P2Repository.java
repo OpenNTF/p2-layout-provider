@@ -11,7 +11,6 @@ import java.util.stream.Stream;
 
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.apache.commons.compress.compressors.lzma.LZMACompressorInputStream;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
