@@ -16,6 +16,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import com.ibm.commons.util.PathUtil;
+import com.ibm.commons.util.io.StreamUtil;
 import com.ibm.commons.xml.DOMUtil;
 import com.ibm.commons.xml.XMLException;
 
@@ -45,33 +46,14 @@ public class P2Repository {
 			this.bundles = new ArrayList<>();
 			
 			try {
-				URI artifactsXml = URI.create(PathUtil.concat(this.uri.toString(), "artifacts.xml", '/')); //$NON-NLS-1$
-				try(InputStream is = artifactsXml.toURL().openStream()) {
-					collectBundles(is, this.bundles);
-				} catch(FileNotFoundException e) {
-					// artifacts.xml is not present
-				}
-				
-				URI artifactsXz = URI.create(PathUtil.concat(this.uri.toString(), "artifacts.xml.xz", '/')); //$NON-NLS-1$
-				try(InputStream is = artifactsXz.toURL().openStream()) {
-					try(InputStream xis = CompressorStreamFactory.getSingleton().createCompressorInputStream(CompressorStreamFactory.getXz(), is)) {
-						collectBundles(xis, this.bundles);
+				InputStream artifactsXml = findXml(this.uri, "artifacts"); //$NON-NLS-1$
+				if(artifactsXml != null) {
+					try {
+						collectBundles(artifactsXml, this.bundles);
+					} finally {
+						StreamUtil.close(artifactsXml);
 					}
-				} catch(FileNotFoundException e) {
-					// artifacts.xml.xz is not present
 				}
-				
-				URI artifactsJar = URI.create(PathUtil.concat(this.uri.toString(), "artifacts.jar", '/')); //$NON-NLS-1$
-				try(InputStream is = artifactsJar.toURL().openStream()) {
-					try(JarInputStream jis = new JarInputStream(is)) {
-						jis.getNextEntry();
-						collectBundles(jis, this.bundles);
-					}
-				} catch(FileNotFoundException e) {
-					// artifacts.jar is not present
-				}
-				
-				
 			} catch(IOException | XMLException | CompressorException e) {
 				throw new RuntimeException(e);
 			}
@@ -82,6 +64,35 @@ public class P2Repository {
 	// *******************************************************************************
 	// * Internal implementation methods
 	// *******************************************************************************
+	
+	private static InputStream findXml(URI baseUri, String baseName) throws IOException, CompressorException {
+		URI xml = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".xml", '/')); //$NON-NLS-1$
+		try {
+			return xml.toURL().openStream();
+		} catch(FileNotFoundException e) {
+			// Plain XML not present
+		}
+		
+		URI xz = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".xml.xz", '/')); //$NON-NLS-1$
+		try {
+			InputStream is = xz.toURL().openStream();
+			return CompressorStreamFactory.getSingleton().createCompressorInputStream(CompressorStreamFactory.getXz(), is);
+		} catch(FileNotFoundException e) {
+			// XZ-compressed XML not present
+		}
+		
+		URI jar = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".jar", '/')); //$NON-NLS-1$
+		try {
+			InputStream is = jar.toURL().openStream();
+			JarInputStream jis = new JarInputStream(is);
+			jis.getNextEntry();
+			return jis;
+		} catch(FileNotFoundException e) {
+			// Jar-compressed XML not present
+		}
+		
+		return null;
+	}
 	
 	private static void collectBundles(InputStream is, List<P2Bundle> bundles) throws XMLException {
 		Document artifactsXml = DOMUtil.createDocument(is);
