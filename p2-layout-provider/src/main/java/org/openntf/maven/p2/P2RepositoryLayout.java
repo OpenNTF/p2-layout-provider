@@ -51,7 +51,7 @@ public class P2RepositoryLayout implements RepositoryLayout {
 	public P2RepositoryLayout(String id, String url) throws IOException {
 		this.id = id;
 		this.url = url;
-		this.metadataScratch = Files.createTempDirectory(getClass().getName() + "-metadata");
+		this.metadataScratch = Files.createTempDirectory(getClass().getName() + "-metadata"); //$NON-NLS-1$
 	}
 
 	@Override
@@ -114,7 +114,7 @@ public class P2RepositoryLayout implements RepositoryLayout {
 				try {
 					Element artifact = (Element)DOMUtil.node(xml, "/repository/artifacts/artifact[@id=\"" + metadata.getArtifactId() + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
 					if(artifact != null) {
-						System.out.println("creating metadata for version " + artifact + " at " + metadataOut);
+						System.out.println("creating metadata for version " + metadata + " at " + metadataOut);
 						String version = artifact.getAttribute("version"); //$NON-NLS-1$
 						
 						Document result = DOMUtil.createDocument();
@@ -128,7 +128,7 @@ public class P2RepositoryLayout implements RepositoryLayout {
 						DOMUtil.createElement(result, versions, "version").setTextContent(version); //$NON-NLS-1$
 						
 						try(OutputStream os = Files.newOutputStream(metadataOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-							DOMUtil.serialize(os, xml, Format.defaultFormat);
+							DOMUtil.serialize(os, result, Format.defaultFormat);
 						}
 					}
 				} catch(IOException | XMLException e) {
