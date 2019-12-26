@@ -16,6 +16,7 @@
 package org.openntf.maven.p2;
 
 import java.io.IOException;
+import java.text.MessageFormat;
 
 import javax.inject.Named;
 
@@ -42,7 +43,7 @@ public class P2RepositoryLayoutFactory implements RepositoryLayoutFactory {
 		}
 		
 		if(log.isDebugEnabled()) {
-			log.debug("Creating new P2RepositoryLayout for repository " + repository.getUrl());
+			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayoutFactory.creatingNew"), repository.getUrl())); //$NON-NLS-1$
 		}
 		
 		try {

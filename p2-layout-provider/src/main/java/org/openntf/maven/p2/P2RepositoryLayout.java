@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.text.MessageFormat;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -75,7 +76,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	@Override
 	public URI getLocation(Artifact artifact, boolean upload) {
 		if(log.isDebugEnabled()) {
-			log.debug("getLocation for artifact " + artifact);
+			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayout.getLocationArtifact"), artifact)); //$NON-NLS-1$
 		}
 		
 		switch(String.valueOf(artifact.getExtension())) {
@@ -129,7 +130,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	@Override
 	public URI getLocation(Metadata metadata, boolean upload) {
 		if(log.isDebugEnabled()) {
-			log.debug("getLocation for metadata " + metadata);
+			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayout.getLocationMetadata"), metadata)); //$NON-NLS-1$
 		}
 		
 		return getMetadata(metadata).toUri();

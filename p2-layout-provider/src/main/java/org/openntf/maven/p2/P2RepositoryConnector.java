@@ -22,6 +22,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.text.MessageFormat;
 import java.util.Collection;
 
 import org.apache.commons.codec.digest.DigestUtils;
@@ -61,9 +62,9 @@ public class P2RepositoryConnector implements RepositoryConnector {
 		checkClosed();
 		
 		if(log.isDebugEnabled()) {
-			log.debug("Issuing get command in repo " + this.repository);
-			log.debug("downloads are " + artifactDownloads);
-			log.debug("metadata is " + metadataDownloads);
+			log.debug(MessageFormat.format(Messages.getString("P2RepositoryConnector.getCommand"), this.repository)); //$NON-NLS-1$
+			log.debug(MessageFormat.format(Messages.getString("P2RepositoryConnector.getCommandDownloads"), artifactDownloads)); //$NON-NLS-1$
+			log.debug(MessageFormat.format(Messages.getString("P2RepositoryConnector.getCommandMetadata"), metadataDownloads)); //$NON-NLS-1$
 		}
 		// TODO see if this should be routed through the session and/or multithreaded
 		if(artifactDownloads != null) {
@@ -72,7 +73,6 @@ public class P2RepositoryConnector implements RepositoryConnector {
 				URI sourceUri = layout.getLocation(download.getArtifact(), false);
 				download(sourceUri, dest);
 				
-				// TODO verify using downloaded checksums
 				for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, sourceUri)) {
 					String ext = checksum.getAlgorithm().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
 					Path checksumPath = dest.getParent().resolve(dest.getFileName().toString()+"."+ext); //$NON-NLS-1$
@@ -115,7 +115,7 @@ public class P2RepositoryConnector implements RepositoryConnector {
 
 	private void checkClosed() {
 		if(this.closed) {
-			throw new IllegalStateException("Connector is closed");
+			throw new IllegalStateException(Messages.getString("P2RepositoryConnector.connectorIsClosed")); //$NON-NLS-1$
 		}
 	}
 	
@@ -135,7 +135,9 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			DigestUtils digest = new DigestUtils(algorithm);
 			String fileChecksum = digest.digestAsHex(artifactPath.toFile());
 			if(!StringUtil.equals(checksum, fileChecksum)) {
-				throw new ChecksumFailureException("Checksum for " + artifactPath + " does not match expected " + algorithm + " value: expected \"" + checksum + "\"; got \"" + fileChecksum + "\"");
+				throw new ChecksumFailureException(MessageFormat.format(
+						Messages.getString("P2RepositoryConnector.checksumMismatch"), artifactPath, //$NON-NLS-1$
+						algorithm, checksum, fileChecksum));
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e);
