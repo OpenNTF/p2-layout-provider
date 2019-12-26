@@ -35,7 +35,11 @@ import org.eclipse.aether.spi.connector.MetadataUpload;
 import org.eclipse.aether.spi.connector.RepositoryConnector;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout.Checksum;
 import org.eclipse.aether.spi.log.Logger;
+import org.eclipse.aether.transfer.ArtifactNotFoundException;
+import org.eclipse.aether.transfer.ArtifactTransferException;
 import org.eclipse.aether.transfer.ChecksumFailureException;
+import org.eclipse.aether.transfer.MetadataNotFoundException;
+import org.eclipse.aether.transfer.MetadataTransferException;
 
 import com.ibm.commons.util.StringUtil;
 
@@ -71,18 +75,20 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			for(ArtifactDownload download : artifactDownloads) {
 				Path dest = download.getFile().toPath();
 				URI sourceUri = layout.getLocation(download.getArtifact(), false);
-				download(sourceUri, dest);
-				
-				for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, sourceUri)) {
-					String ext = checksum.getAlgorithm().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
-					Path checksumPath = dest.getParent().resolve(dest.getFileName().toString()+"."+ext); //$NON-NLS-1$
-					download(sourceUri.resolve(checksum.getLocation()), checksumPath);
+				try {
+					download(sourceUri, dest);
 					
-					try {
+					for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, sourceUri)) {
+						String ext = checksum.getAlgorithm().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
+						Path checksumPath = dest.getParent().resolve(dest.getFileName().toString()+"."+ext); //$NON-NLS-1$
+						download(sourceUri.resolve(checksum.getLocation()), checksumPath);
+						
 						verifyChecksum(dest, checksumPath, checksum.getAlgorithm());
-					} catch (ChecksumFailureException e) {
-						throw new RuntimeException(e);
 					}
+				} catch(FileNotFoundException e) {
+					download.setException(new ArtifactNotFoundException(download.getArtifact(), repository, Messages.getString("P2RepositoryConnector.artifactNotFound"), e)); //$NON-NLS-1$
+				} catch(Exception e) {
+					download.setException(new ArtifactTransferException(download.getArtifact(), repository, Messages.getString("P2RepositoryConnector.exceptionTransferringArtifact"), e)); //$NON-NLS-1$
 				}
 			}
 		}
@@ -90,7 +96,13 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			for(MetadataDownload download : metadataDownloads) {
 				Path dest = download.getFile().toPath();
 				URI sourceUri = layout.getLocation(download.getMetadata(), false);
-				download(sourceUri, dest);
+				try {
+					download(sourceUri, dest);
+				} catch(FileNotFoundException e) {
+					download.setException(new MetadataNotFoundException(download.getMetadata(), repository, Messages.getString("P2RepositoryConnector.metadataNotFound"), e)); //$NON-NLS-1$
+				} catch(Exception e) {
+					download.setException(new MetadataTransferException(download.getMetadata(), repository, Messages.getString("P2RepositoryConnector.exceptionTransferringMetadata"), e)); //$NON-NLS-1$
+				}
 			}
 		}
 	}
@@ -119,13 +131,9 @@ public class P2RepositoryConnector implements RepositoryConnector {
 		}
 	}
 	
-	private void download(URI source, Path dest) {
+	private void download(URI source, Path dest) throws FileNotFoundException, IOException {
 		try(InputStream is = source.toURL().openStream()) {
 			Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
-		} catch(FileNotFoundException e) {
-			// Ignore
-		} catch (IOException e) {
-			throw new RuntimeException(e);
 		}
 	}
 	

@@ -61,7 +61,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private Document artifactsJar;
 	private boolean checkedArtifacts;
 	
-	private Map<Artifact, Path> poms = new HashMap<>();
+	private Map<String, Path> poms = new HashMap<>();
 	private Map<String, Path> metadatas = new HashMap<>();
 	private Map<Artifact, List<Checksum>> checksums = new HashMap<>();
 	private Map<String, Path> localJars = new HashMap<>();
@@ -70,7 +70,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		this.id = id;
 		this.url = url;
 		this.log = log;
-		this.metadataScratch = Files.createTempDirectory(getClass().getName() + "-metadata"); //$NON-NLS-1$
+		this.metadataScratch = Files.createTempDirectory(getClass().getName() + '-' + id + "-metadata"); //$NON-NLS-1$
 	}
 
 	@Override
@@ -228,7 +228,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	}
 	
 	private Path getPom(Artifact artifact) {
-		return this.poms.computeIfAbsent(artifact, key -> {
+		return this.poms.computeIfAbsent(artifact.getArtifactId() + artifact.getVersion(), key -> {
 			Path pomOut = this.metadataScratch.resolve(artifact.getArtifactId() + "-" + artifact.getVersion() + ".pom"); //$NON-NLS-1$ //$NON-NLS-2$
 			if(!Files.exists(pomOut) && this.id.equals(artifact.getGroupId())) {
 				// Check if it exists in the artifacts.jar
