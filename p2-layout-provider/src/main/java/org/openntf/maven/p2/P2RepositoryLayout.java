@@ -34,6 +34,8 @@ import java.util.Optional;
 import java.util.jar.JarInputStream;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.metadata.Metadata;
@@ -61,7 +63,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private Map<Artifact, Path> poms = new HashMap<>();
 	private Map<String, Path> metadatas = new HashMap<>();
 	private Map<Artifact, List<Checksum>> checksums = new HashMap<>();
-	private Map<Artifact, Path> localJars = new HashMap<>();
+	private Map<String, Path> localJars = new HashMap<>();
 
 	public P2RepositoryLayout(String id, String url, Logger log) throws IOException {
 		this.id = id;
@@ -96,15 +98,27 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			}
 			case "": { //$NON-NLS-1$
 				// Then it's just the jar
-				return getLocalJar(artifact)
+				return getLocalJar(artifact, false)
 					.map(Path::toUri)
 					.orElse(fakeUri());
 			}
 			default: {
-				// TODO search inside Jar for embeds
-				String jar = artifact.getArtifactId() + "." + artifact.getClassifier() + "_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-				String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
-				return URI.create(url);
+				Path localJar = getLocalJar(artifact, true).orElse(null);
+				if(localJar != null) {
+					System.out.println("checking " + localJar + " for classifier " + artifact.getClassifier());
+					try(ZipFile jarFile = new ZipFile(localJar.toFile())) {
+						ZipEntry classifiedEntry = jarFile.getEntry(artifact.getClassifier() + '.' + artifact.getExtension());
+						if(classifiedEntry != null) {
+							return URI.create("jar:" + localJar.toUri().toString() + "!/" + classifiedEntry.getName()); //$NON-NLS-1$ //$NON-NLS-2$
+						}
+					} catch (IOException e) {
+						throw new RuntimeException(e);
+					}
+					String jar = artifact.getArtifactId() + "." + artifact.getClassifier() + "_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+					String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
+					return URI.create(url);
+				}
+				return fakeUri();
 			}
 			}
 		}
@@ -141,7 +155,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 								try {
 									String algorithm = property.getAttribute("name").substring("download.checksum.".length()); //$NON-NLS-1$ //$NON-NLS-2$
 									String value = property.getAttribute("value"); //$NON-NLS-1$
-									Path checksumFile = metadataScratch.resolve(toFileName(artifact) + "." + algorithm); //$NON-NLS-1$
+									Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
 									Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 									return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
 								} catch(IOException e) {
@@ -312,10 +326,10 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		return nodes.isEmpty() ? null : nodes.get(0);
 	}
 	
-	private Optional<Path> getLocalJar(Artifact artifact) {
-		return Optional.ofNullable(localJars.computeIfAbsent(artifact, key -> {
-			String jar = toFileName(artifact);
-			String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
+	private Optional<Path> getLocalJar(Artifact artifact, boolean ignoreClassifier) {
+		String jar = toFileName(artifact, ignoreClassifier);
+		return Optional.ofNullable(localJars.computeIfAbsent(jar, key -> {
+			String url = PathUtil.concat(this.url, "plugins/" + key, '/'); //$NON-NLS-1$
 			URI uri = URI.create(url);
 			try(InputStream is = uri.toURL().openStream()) {
 				Path localJar = this.metadataScratch.resolve(jar);
@@ -330,10 +344,10 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		}));
 	}
 	
-	private String toFileName(Artifact artifact) {
+	private String toFileName(Artifact artifact, boolean ignoreClassifier) {
 		StringBuilder builder = new StringBuilder();
 		builder.append(artifact.getArtifactId());
-		if(StringUtil.isNotEmpty(artifact.getClassifier())) {
+		if(!ignoreClassifier && StringUtil.isNotEmpty(artifact.getClassifier())) {
 			builder.append("."); //$NON-NLS-1$
 			if("sources".equals(artifact.getClassifier())) { //$NON-NLS-1$
 				builder.append("source"); //$NON-NLS-1$
