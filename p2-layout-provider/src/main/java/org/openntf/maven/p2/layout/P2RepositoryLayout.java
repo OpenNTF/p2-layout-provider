@@ -116,9 +116,6 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 					} catch (IOException e) {
 						throw new RuntimeException(e);
 					}
-					String jar = artifact.getArtifactId() + "." + artifact.getClassifier() + "_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-					String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
-					return URI.create(url);
 				}
 				return fakeUri();
 			}
