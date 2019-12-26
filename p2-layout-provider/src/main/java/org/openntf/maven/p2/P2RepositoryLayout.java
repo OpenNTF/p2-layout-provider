@@ -105,7 +105,6 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			default: {
 				Path localJar = getLocalJar(artifact, true).orElse(null);
 				if(localJar != null) {
-					System.out.println("checking " + localJar + " for classifier " + artifact.getClassifier());
 					try(ZipFile jarFile = new ZipFile(localJar.toFile())) {
 						ZipEntry classifiedEntry = jarFile.getEntry(artifact.getClassifier() + '.' + artifact.getExtension());
 						if(classifiedEntry != null) {
