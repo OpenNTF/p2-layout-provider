@@ -32,6 +32,7 @@ import org.eclipse.aether.spi.connector.ArtifactUpload;
 import org.eclipse.aether.spi.connector.MetadataDownload;
 import org.eclipse.aether.spi.connector.MetadataUpload;
 import org.eclipse.aether.spi.connector.RepositoryConnector;
+import org.eclipse.aether.spi.connector.layout.RepositoryLayout.Checksum;
 
 public class P2RepositoryConnector implements RepositoryConnector {
 	private static final Logger log = P2RepositoryLayoutProvider.log;
@@ -64,10 +65,13 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			for(ArtifactDownload download : artifactDownloads) {
 				Path dest = download.getFile().toPath();
 				URI sourceUri = layout.getLocation(download.getArtifact(), false);
-				try(InputStream is = sourceUri.toURL().openStream()) {
-					Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
-				} catch (IOException e) {
-					throw new RuntimeException(e);
+				download(sourceUri, dest);
+				
+				// TODO verify using downloaded checksums
+				for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, null)) {
+					String ext = checksum.getAlgorithm().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
+					Path checksumPath = dest.getParent().resolve(dest.getFileName().toString()+"."+ext); //$NON-NLS-1$
+					download(checksum.getLocation(), checksumPath);
 				}
 			}
 		}
@@ -75,11 +79,7 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			for(MetadataDownload download : metadataDownloads) {
 				Path dest = download.getFile().toPath();
 				URI sourceUri = layout.getLocation(download.getMetadata(), false);
-				try(InputStream is = sourceUri.toURL().openStream()) {
-					Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
+				download(sourceUri, dest);
 			}
 		}
 	}
@@ -97,10 +97,22 @@ public class P2RepositoryConnector implements RepositoryConnector {
 		this.layout.close();
 		this.closed = true;
 	}
+	
+	// *******************************************************************************
+	// * Internal implementation methods
+	// *******************************************************************************
 
 	private void checkClosed() {
 		if(this.closed) {
 			throw new IllegalStateException("Connector is closed");
+		}
+	}
+	
+	private void download(URI source, Path dest) {
+		try(InputStream is = source.toURL().openStream()) {
+			Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
 		}
 	}
 }

@@ -22,6 +22,7 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,6 +31,8 @@ import java.util.Map;
 import java.util.jar.JarInputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.metadata.Metadata;
@@ -51,8 +54,9 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private Document artifactsJar;
 	private boolean checkedArtifacts;
 	
-	private Map<String, Path> poms = new HashMap<>();
+	private Map<Artifact, Path> poms = new HashMap<>();
 	private Map<String, Path> metadatas = new HashMap<>();
+	private Map<Artifact, List<Checksum>> checksums = new HashMap<>();
 
 	public P2RepositoryLayout(String id, String url) throws IOException {
 		this.id = id;
@@ -91,6 +95,41 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 
 	@Override
 	public List<Checksum> getChecksums(Artifact artifact, boolean upload, URI location) {
+		// This implementation doesn't currently work, as it runs afoul of Checksum's constructor's requirement
+		//   that the URI must be relative. That will mean that we'll have to pre-download the Jar, which is
+		//   a bit of a shame
+//		return this.checksums.computeIfAbsent(artifact, key -> {
+//			if("pom".equals(key.getExtension())) { //$NON-NLS-1$
+//				return Collections.emptyList();
+//			}
+//			
+//			Document artifactsXml = getArtifactsXml();
+//			if(artifactsXml != null) {
+//				try {
+//					Element artifactNode = findArtifactNode(artifactsXml, artifact.getArtifactId(), artifact.getVersion());
+//					if(artifactNode != null) {
+//						return Stream.of(DOMUtil.nodes(artifactNode, "properties/property")) //$NON-NLS-1$
+//							.map(Element.class::cast)
+//							.filter(property -> String.valueOf(property.getAttribute("name")).startsWith("download.checksum.")) //$NON-NLS-1$ //$NON-NLS-2$
+//							.map(property -> {
+//								try {
+//									String algorithm = property.getAttribute("name").substring("download.checksum.".length()); //$NON-NLS-1$ //$NON-NLS-2$
+//									String value = property.getAttribute("value"); //$NON-NLS-1$
+//									Path checksumFile = metadataScratch.resolve(key.getArtifactId() + "-" + key.getVersion() + "-" + key.getClassifier() + "." + algorithm); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+//									Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+//									return new Checksum(algorithm, checksumFile.toUri());
+//								} catch(IOException e) {
+//									throw new RuntimeException(e);
+//								}
+//							})
+//							.collect(Collectors.toList());
+//					}
+//				} catch(XMLException e) {
+//					throw new RuntimeException(e);
+//				}
+//			}
+//			return Collections.emptyList();
+//		});
 		return Collections.emptyList();
 	}
 
@@ -115,6 +154,16 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				// Ignore
 			}
 		}
+		for(List<Checksum> cks : checksums.values()) {
+			for(Checksum checksum : cks) {
+				try {
+					Path path = Paths.get(checksum.getLocation());
+					Files.deleteIfExists(path);
+				} catch (IOException e) {
+					// Ignore
+				}
+			}
+		}
 		try {
 			Files.deleteIfExists(this.metadataScratch);
 		} catch (IOException e) {
@@ -127,14 +176,14 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	// *******************************************************************************
 	
 	private Path getPom(Artifact artifact) {
-		return this.poms.computeIfAbsent(artifact.getArtifactId()+artifact.getVersion(), key -> {
+		return this.poms.computeIfAbsent(artifact, key -> {
 			Path pomOut = this.metadataScratch.resolve(artifact.getArtifactId() + "-" + artifact.getVersion() + ".pom"); //$NON-NLS-1$ //$NON-NLS-2$
 			if(!Files.exists(pomOut) && this.id.equals(artifact.getGroupId())) {
 				// Check if it exists in the artifacts.jar
-				Document artifactsJar = getArtifactsJar();
-				if(artifactsJar != null) {
+				Document artifactsXml = getArtifactsXml();
+				if(artifactsXml != null) {
 					try {
-						Element artifactNode = (Element)DOMUtil.node(artifactsJar, "/repository/artifacts/artifact[@id=\"" + artifact.getArtifactId() + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
+						Element artifactNode = findArtifactNode(artifactsXml, artifact.getArtifactId(), artifact.getVersion());
 						if(artifactNode != null) {
 							// Then it's safe to make a file for it
 							Document xml = DOMUtil.createDocument();
@@ -161,13 +210,14 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		return this.metadatas.computeIfAbsent(metadata.getArtifactId(), key -> {
 			Path metadataOut = this.metadataScratch.resolve("maven-metadata-" + metadata.getArtifactId() + ".xml"); //$NON-NLS-1$ //$NON-NLS-2$
 			if(!Files.exists(metadataOut) && this.id.equals(metadata.getGroupId())) {
-				Document xml = getArtifactsJar();
-				if(xml != null) {
+				Document artifactsXml = getArtifactsXml();
+				if(artifactsXml != null) {
 					// Create a temporary maven-metadata.xml
 					try {
-						Element artifact = (Element)DOMUtil.node(xml, "/repository/artifacts/artifact[@id=\"" + metadata.getArtifactId() + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
-						if(artifact != null) {
-							String version = artifact.getAttribute("version"); //$NON-NLS-1$
+						// TODO support 
+						Element artifactNode = findArtifactNode(artifactsXml, metadata.getArtifactId(), null);
+						if(artifactNode != null) {
+							String version = artifactNode.getAttribute("version"); //$NON-NLS-1$
 							
 							Document result = DOMUtil.createDocument();
 							Element metadataNode = DOMUtil.createElement(result, "metadata"); //$NON-NLS-1$
@@ -192,7 +242,28 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		});
 	}
 	
-	private synchronized Document getArtifactsJar() {
+	private List<Element> findArtifactNodes(Document xml, String artifactId) throws XMLException {
+		Object[] nodes = DOMUtil.nodes(xml, "/repository/artifacts/artifact[@id=\"" + artifactId + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
+		// Filter out any with a "processing" child
+		return Stream.of(nodes)
+			.map(Element.class::cast)
+			.filter(el -> {
+				try {
+					return DOMUtil.nodes(el, "processing").length == 0; //$NON-NLS-1$
+				} catch (XMLException e) {
+					throw new RuntimeException(e);
+				}
+			})
+			.collect(Collectors.toList());
+	}
+	
+	private Element findArtifactNode(Document xml, String artifactId, String version) throws XMLException {
+		List<Element> nodes = findArtifactNodes(xml, artifactId);
+		// TODO filter to version
+		return nodes.isEmpty() ? null : nodes.get(0);
+	}
+	
+	private synchronized Document getArtifactsXml() {
 		if(!checkedArtifacts) {
 			this.checkedArtifacts = true;
 			if(this.artifactsJar == null) {
