@@ -22,6 +22,14 @@
 			<email>jesse@frostillic.us</email>
 		</developer>
 	</developers>
+	
+	<distributionManagement>
+		<repository>
+			<id>artifactory.openntf.org</id>
+			<name>artifactory.openntf.org</name>
+			<url>https://artifactory.openntf.org/openntf</url>
+		</repository>
+	</distributionManagement>
 
 	<properties>
 		<maven.compiler.source>1.8</maven.compiler.source>
@@ -33,23 +41,8 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.maven.resolver</groupId>
-			<artifactId>maven-resolver-api</artifactId>
-			<version>1.4.1</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.maven.resolver</groupId>
 			<artifactId>maven-resolver-spi</artifactId>
 			<version>1.4.1</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.maven.resolver</groupId>
-			<artifactId>maven-resolver-util</artifactId>
-			<version>1.4.1</version>
-		</dependency>
-		<dependency>
-			<groupId>org.eclipse.aether</groupId>
-			<artifactId>aether-connector-basic</artifactId>
-			<version>1.1.0</version>
 		</dependency>
 		<dependency>
 			<groupId>javax.inject</groupId>
