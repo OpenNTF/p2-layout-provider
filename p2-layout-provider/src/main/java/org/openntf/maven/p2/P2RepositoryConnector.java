@@ -38,6 +38,7 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	
 	private final RemoteRepository repository;
 	private final P2RepositoryLayout layout;
+	private boolean closed;
 	
 	public P2RepositoryConnector(RepositorySystemSession session, RemoteRepository repository) {
 		this.repository = repository;
@@ -51,6 +52,8 @@ public class P2RepositoryConnector implements RepositoryConnector {
 
 	@Override
 	public void get(Collection<? extends ArtifactDownload> artifactDownloads, Collection<? extends MetadataDownload> metadataDownloads) {
+		checkClosed();
+		
 		if(log.isLoggable(Level.FINEST)) {
 			log.finest("Issuing get command in repo " + this.repository);
 			log.finest("downloads are " + artifactDownloads);
@@ -84,12 +87,20 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	@Override
 	public void put(Collection<? extends ArtifactUpload> artifactUploads,
 			Collection<? extends MetadataUpload> metadataUploads) {
+		checkClosed();
+		
 		// Not supported
 	}
 
 	@Override
 	public void close() {
-		
+		this.layout.close();
+		this.closed = true;
 	}
 
+	private void checkClosed() {
+		if(this.closed) {
+			throw new IllegalStateException("Connector is closed");
+		}
+	}
 }
