@@ -62,7 +62,6 @@ public class P2RepositoryLayout implements RepositoryLayout {
 		
 		switch(String.valueOf(artifact.getExtension())) {
 		case "pom": { //$NON-NLS-1$
-			// TODO create virtual pom
 			Path pomOut = this.metadataScratch.resolve(artifact.getArtifactId() + "-" + artifact.getVersion() + ".pom"); //$NON-NLS-1$ //$NON-NLS-2$
 			if(!Files.exists(pomOut) && this.id.equals(artifact.getGroupId())) {
 				// Check if it exists in the artifacts.jar
