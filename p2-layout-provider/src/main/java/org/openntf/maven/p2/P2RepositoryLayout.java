@@ -29,14 +29,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.jar.JarInputStream;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.metadata.Metadata;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
+import org.eclipse.aether.spi.log.Logger;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -46,7 +45,7 @@ import com.ibm.commons.xml.Format;
 import com.ibm.commons.xml.XMLException;
 
 public class P2RepositoryLayout implements RepositoryLayout, Closeable {
-	private static final Logger log = P2RepositoryLayoutProvider.log;
+	private final Logger log;
 
 	private String id;
 	private String url;
@@ -58,16 +57,17 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private Map<String, Path> metadatas = new HashMap<>();
 	private Map<Artifact, List<Checksum>> checksums = new HashMap<>();
 
-	public P2RepositoryLayout(String id, String url) throws IOException {
+	public P2RepositoryLayout(String id, String url, Logger log) throws IOException {
 		this.id = id;
 		this.url = url;
+		this.log = log;
 		this.metadataScratch = Files.createTempDirectory(getClass().getName() + "-metadata"); //$NON-NLS-1$
 	}
 
 	@Override
 	public URI getLocation(Artifact artifact, boolean upload) {
-		if(log.isLoggable(Level.FINEST)) {
-			log.finest("getLocation for artifact " + artifact);
+		if(log.isDebugEnabled()) {
+			log.debug("getLocation for artifact " + artifact);
 		}
 		
 		switch(String.valueOf(artifact.getExtension())) {
@@ -86,8 +86,8 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 
 	@Override
 	public URI getLocation(Metadata metadata, boolean upload) {
-		if(log.isLoggable(Level.FINEST)) {
-			log.finest("getLocation for metadata " + metadata);
+		if(log.isDebugEnabled()) {
+			log.debug("getLocation for metadata " + metadata);
 		}
 		
 		return getMetadata(metadata).toUri();

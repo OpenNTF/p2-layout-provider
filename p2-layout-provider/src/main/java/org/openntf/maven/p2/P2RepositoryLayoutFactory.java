@@ -16,8 +16,6 @@
 package org.openntf.maven.p2;
 
 import java.io.IOException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import javax.inject.Named;
 
@@ -25,11 +23,16 @@ import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayoutFactory;
+import org.eclipse.aether.spi.log.Logger;
 import org.eclipse.aether.transfer.NoRepositoryLayoutException;
 
 @Named("p2")
-public class P2RepositoryLayoutProvider implements RepositoryLayoutFactory {
-	public static final Logger log = Logger.getLogger(P2RepositoryLayoutProvider.class.getPackage().getName());
+public class P2RepositoryLayoutFactory implements RepositoryLayoutFactory {
+	public final Logger log;
+	
+	public P2RepositoryLayoutFactory(Logger log) {
+		this.log = log;
+	}
 
 	@Override
 	public RepositoryLayout newInstance(RepositorySystemSession session, RemoteRepository repository)
@@ -38,12 +41,12 @@ public class P2RepositoryLayoutProvider implements RepositoryLayoutFactory {
 			throw new NoRepositoryLayoutException(repository);
 		}
 		
-		if(log.isLoggable(Level.INFO)) {
-			log.info("Creating new P2RepositoryLayout for repository " + repository.getUrl());
+		if(log.isDebugEnabled()) {
+			log.debug("Creating new P2RepositoryLayout for repository " + repository.getUrl());
 		}
 		
 		try {
-			return new P2RepositoryLayout(repository.getId(), repository.getUrl());
+			return new P2RepositoryLayout(repository.getId(), repository.getUrl(), log);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}

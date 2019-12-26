@@ -22,8 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collection;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
@@ -33,19 +31,21 @@ import org.eclipse.aether.spi.connector.MetadataDownload;
 import org.eclipse.aether.spi.connector.MetadataUpload;
 import org.eclipse.aether.spi.connector.RepositoryConnector;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout.Checksum;
+import org.eclipse.aether.spi.log.Logger;
 
 public class P2RepositoryConnector implements RepositoryConnector {
-	private static final Logger log = P2RepositoryLayoutProvider.log;
+	private final Logger log;
 	
 	private final RemoteRepository repository;
 	private final P2RepositoryLayout layout;
 	private boolean closed;
 	
-	public P2RepositoryConnector(RepositorySystemSession session, RemoteRepository repository) {
+	public P2RepositoryConnector(RepositorySystemSession session, RemoteRepository repository, Logger logger) {
 		this.repository = repository;
+		this.log = logger;
 		try {
 			// TODO support auth
-			this.layout = new P2RepositoryLayout(repository.getId(), repository.getUrl());
+			this.layout = new P2RepositoryLayout(repository.getId(), repository.getUrl(), log);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -55,10 +55,10 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	public void get(Collection<? extends ArtifactDownload> artifactDownloads, Collection<? extends MetadataDownload> metadataDownloads) {
 		checkClosed();
 		
-		if(log.isLoggable(Level.FINEST)) {
-			log.finest("Issuing get command in repo " + this.repository);
-			log.finest("downloads are " + artifactDownloads);
-			log.finest("metadata is " + metadataDownloads);
+		if(log.isDebugEnabled()) {
+			log.debug("Issuing get command in repo " + this.repository);
+			log.debug("downloads are " + artifactDownloads);
+			log.debug("metadata is " + metadataDownloads);
 		}
 		// TODO see if this should be routed through the session and/or multithreaded
 		if(artifactDownloads != null) {

@@ -15,16 +15,32 @@
  */
 package org.openntf.maven.p2;
 
+import javax.inject.Inject;
 import javax.inject.Named;
 
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.spi.connector.RepositoryConnector;
 import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
+import org.eclipse.aether.spi.log.Logger;
+import org.eclipse.aether.spi.log.LoggerFactory;
+import org.eclipse.aether.spi.log.NullLoggerFactory;
 import org.eclipse.aether.transfer.NoRepositoryConnectorException;
 
 @Named("p2repo")
 public class P2RepositoryConnectorFactory implements RepositoryConnectorFactory {
+
+    private Logger logger = NullLoggerFactory.LOGGER;
+    
+	
+	public P2RepositoryConnectorFactory() {
+		
+	}
+	
+	@Inject
+	public P2RepositoryConnectorFactory(LoggerFactory loggerFactory) {
+		this.logger = loggerFactory.getLogger(getClass().getPackage().getName());
+	}
 
 	@Override
 	public RepositoryConnector newInstance(RepositorySystemSession session, RemoteRepository repository)
@@ -32,7 +48,7 @@ public class P2RepositoryConnectorFactory implements RepositoryConnectorFactory 
 		if(!"p2".equals(repository.getContentType())) { //$NON-NLS-1$
 			throw new NoRepositoryConnectorException(repository);
 		}
-		return new P2RepositoryConnector(session, repository);
+		return new P2RepositoryConnector(session, repository, logger);
 	}
 
 	@Override
