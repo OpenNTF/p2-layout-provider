@@ -51,3 +51,20 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 	</build>
 </project>
 ```
+
+### Embedded Jars
+
+To access a Jar embedded inside an OSGi artifact, use the embedded Jar's base name as a classifier:
+
+```xml
+<dependency>
+    <groupId>some.repo.id</groupId>
+    <artifactId>some.artifact</artifactId>
+    <version>[1.0.0,)</version>
+    <classifier>example.embedded</classifier>   <!-- matches example.embedded.jar -->
+</dependency>
+```
+
+### Sources
+
+This provider handles source Jars by looking for a bundle of the same artifact ID plus ".source" when asked for the "sources" classifier.
