@@ -135,7 +135,7 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			DigestUtils digest = new DigestUtils(algorithm);
 			String fileChecksum = digest.digestAsHex(artifactPath.toFile());
 			if(!StringUtil.equals(checksum, fileChecksum)) {
-				throw new ChecksumFailureException("Checksum for " + artifactPath + "does not match expected " + algorithm + " value " + checksum);
+				throw new ChecksumFailureException("Checksum for " + artifactPath + " does not match expected " + algorithm + " value " + checksum);
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e);
