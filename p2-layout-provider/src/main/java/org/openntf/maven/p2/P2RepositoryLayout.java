@@ -321,8 +321,10 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	
 	private Element findArtifactNode(Document xml, String artifactId, String version) throws XMLException {
 		List<Element> nodes = findArtifactNodes(xml, artifactId);
-		// TODO filter to version
-		return nodes.isEmpty() ? null : nodes.get(0);
+		return nodes.stream()
+			.filter(node -> version == null || version.equals(node.getAttribute("version"))) //$NON-NLS-1$
+			.findFirst()
+			.orElse(null);
 	}
 	
 	private Optional<Path> getLocalJar(Artifact artifact, boolean ignoreClassifier) {
