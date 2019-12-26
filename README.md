@@ -13,6 +13,14 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 	<groupId>com.example</groupId>
 	<artifactId>p2-resolution.example</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	
+	<pluginRepositories>
+		<pluginRepository>
+			<id>artifactory.openntf.org</id>
+			<name>artifactory.openntf.org</name>
+			<url>https://artifactory.openntf.org/openntf</url>
+		</pluginRepository>
+	</pluginRepositories>
 
 	<repositories>
 		<repository>
