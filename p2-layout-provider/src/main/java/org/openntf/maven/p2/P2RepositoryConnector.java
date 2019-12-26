@@ -15,6 +15,7 @@
  */
 package org.openntf.maven.p2;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -111,6 +112,8 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	private void download(URI source, Path dest) {
 		try(InputStream is = source.toURL().openStream()) {
 			Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
+		} catch(FileNotFoundException e) {
+			// Ignore
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
