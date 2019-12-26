@@ -1,38 +1,53 @@
-# P2 Maven Proxy
+# P2 Maven Resolver
 
-This project is a Java web app that serves as a basic proxy to provide a Maven repository front-end to p2 (Eclipse-style) repositories.
-
-## Configuration
-
-Configuration can be done by running the app and then visiting {appUrl}/admin/repos, which allows you to add p2 repositories with a group ID and a remote repo URI.
-
-**Note:** currently, it is required that the group IDs _not_ contain dots. For example, "foo-bar" is legal, but "foo.bar" is not.
+This project is a Maven plugin to allow basic resolution of artifacts from a p2 (Eclipse-style) repository.
 
 ## Use
 
-Once one or more repository has been added, you can use the running app by adding a repository to your Maven pom.xml:
+To use this plugin, add it to the `<build>` section of your project's Pom with `<extensions>true</extensions>`. Then, add a repository with `<layout>p2</layout>` pointing at a location containing an "artifacts.jar" file and a "plugins" directory. Once that is set up, you can refer to p2-hosted artifacts with a `groupId` matching the `id` of the repository you add.
 
 ```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.example</groupId>
+	<artifactId>p2-resolution.example</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+
 	<repositories>
 		<repository>
-			<id>proxy</id>
-			<url>http://example.com/p2proxy/repo</url>
+			<id>org.eclipse.p2.repo</id>
+			<url>http://download.eclipse.org/releases/2019-12/201912181000</url>
+			<layout>p2</layout>
 		</repository>
 	</repositories>
-```
 
-And then you can add dependencies in the form of (assuming you added an Eclipse IDE repo with the groupId "proxy-eclipse-201912"):
+	<dependencies>
+		<dependency>
+			<groupId>org.eclipse.p2.repo</groupId>
+			<artifactId>ch.qos.logback.slf4j</artifactId>
+			<version>1.1.2.v20160301-0943</version>
+		</dependency>
+	</dependencies>
 
-```xml
-	<dependency>
-		<groupId>proxy-eclipse-201912</groupId>
-		<artifactId>org.eclipse.equinox.useradmin.source</artifactId>
-		<version>1.1.700.v20181116-1551</version> <!-- or a range like [1.0.0,) -->
-	</dependency>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.openntf.maven</groupId>
+				<artifactId>p2-layout-resolver</artifactId>
+				<version>1.0.0-SNAPSHOT</version>
+				<extensions>true</extensions>
+			</plugin>
+		</plugins>
+	</build>
+</project>
 ```
 
 ## TODO
 
-- Add support for browing repositories from the root
-- Add a web UI
-- Add a `java.util.prefs.PreferencesFactory` implementation
+- Fix support for version ranges
+- Remove unneeded dependencies
+- Investigate multithreaded downloads
+- Support composite p2 repositories
+- Support uncompressed and .xml.xz artifacts files
+- Change loggers to emit Maven standard output
