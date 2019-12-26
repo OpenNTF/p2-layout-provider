@@ -42,12 +42,3 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 	</build>
 </project>
 ```
-
-## TODO
-
-- Fix support for version ranges
-- Remove unneeded dependencies
-- Investigate multithreaded downloads
-- Support composite p2 repositories
-- Support uncompressed and .xml.xz artifacts files
-- Change loggers to emit Maven standard output
