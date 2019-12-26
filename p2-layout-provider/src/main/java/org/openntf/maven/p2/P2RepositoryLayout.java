@@ -56,8 +56,8 @@ public class P2RepositoryLayout implements RepositoryLayout {
 
 	@Override
 	public URI getLocation(Artifact artifact, boolean upload) {
-		if(log.isLoggable(Level.INFO)) {
-			log.info("getLocation for artifact " + artifact);
+		if(log.isLoggable(Level.FINEST)) {
+			log.finest("getLocation for artifact " + artifact);
 		}
 		
 		switch(String.valueOf(artifact.getExtension())) {
@@ -102,8 +102,8 @@ public class P2RepositoryLayout implements RepositoryLayout {
 
 	@Override
 	public URI getLocation(Metadata metadata, boolean upload) {
-		if(log.isLoggable(Level.INFO)) {
-			log.info("getLocation for metadata " + metadata);
+		if(log.isLoggable(Level.FINEST)) {
+			log.finest("getLocation for metadata " + metadata);
 		}
 		
 		Path metadataOut = this.metadataScratch.resolve("maven-metadata-" + metadata.getArtifactId() + ".xml"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -114,7 +114,6 @@ public class P2RepositoryLayout implements RepositoryLayout {
 				try {
 					Element artifact = (Element)DOMUtil.node(xml, "/repository/artifacts/artifact[@id=\"" + metadata.getArtifactId() + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
 					if(artifact != null) {
-						System.out.println("creating metadata for version " + metadata + " at " + metadataOut);
 						String version = artifact.getAttribute("version"); //$NON-NLS-1$
 						
 						Document result = DOMUtil.createDocument();
