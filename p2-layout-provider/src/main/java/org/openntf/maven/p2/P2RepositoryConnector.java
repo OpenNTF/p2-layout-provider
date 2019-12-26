@@ -40,6 +40,7 @@ import org.eclipse.aether.transfer.ArtifactTransferException;
 import org.eclipse.aether.transfer.ChecksumFailureException;
 import org.eclipse.aether.transfer.MetadataNotFoundException;
 import org.eclipse.aether.transfer.MetadataTransferException;
+import org.openntf.maven.p2.layout.P2RepositoryLayout;
 
 import com.ibm.commons.util.StringUtil;
 

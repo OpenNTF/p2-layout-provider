@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openntf.maven.p2;
+package org.openntf.maven.p2.layout;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -26,6 +26,7 @@ import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayoutFactory;
 import org.eclipse.aether.spi.log.Logger;
 import org.eclipse.aether.transfer.NoRepositoryLayoutException;
+import org.openntf.maven.p2.Messages;
 
 @Named("p2")
 public class P2RepositoryLayoutFactory implements RepositoryLayoutFactory {

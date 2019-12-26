@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openntf.maven.p2;
+package org.openntf.maven.p2.layout;
 
 import java.io.Closeable;
 import java.io.FileNotFoundException;
@@ -42,6 +42,8 @@ import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.metadata.Metadata;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
 import org.eclipse.aether.spi.log.Logger;
+import org.openntf.maven.p2.Messages;
+import org.openntf.maven.p2.model.P2Bundle;
 import org.osgi.framework.Version;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -58,7 +60,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private String id;
 	private String url;
 	private Path metadataScratch;
-	private Document artifactsJar;
+	private List<P2Bundle> bundles;
 	private boolean checkedArtifacts;
 	
 	private Map<String, Path> poms = new HashMap<>();
@@ -139,34 +141,30 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	@Override
 	public List<Checksum> getChecksums(Artifact artifact, boolean upload, URI location) {
 		return this.checksums.computeIfAbsent(artifact, key -> {
-			if("pom".equals(key.getExtension()) || StringUtil.isNotEmpty(artifact.getClassifier())) { //$NON-NLS-1$
+			if(!"jar".equals(key.getExtension()) || StringUtil.isNotEmpty(artifact.getClassifier())) { //$NON-NLS-1$
 				return Collections.emptyList();
 			}
 			
-			Document artifactsXml = getArtifactsXml();
-			if(artifactsXml != null) {
-				try {
-					Element artifactNode = findArtifactNode(artifactsXml, artifact.getArtifactId(), artifact.getVersion());
-					if(artifactNode != null) {
-						return Stream.of(DOMUtil.nodes(artifactNode, "properties/property")) //$NON-NLS-1$
-							.map(Element.class::cast)
-							.filter(property -> String.valueOf(property.getAttribute("name")).startsWith("download.checksum.")) //$NON-NLS-1$ //$NON-NLS-2$
-							.map(property -> {
-								try {
-									String algorithm = property.getAttribute("name").substring("download.checksum.".length()); //$NON-NLS-1$ //$NON-NLS-2$
-									String value = property.getAttribute("value"); //$NON-NLS-1$
-									Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
-									Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-									return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
-								} catch(IOException e) {
-									throw new RuntimeException(e);
-								}
-							})
-							.collect(Collectors.toList());
-					}
-				} catch(XMLException e) {
-					throw new RuntimeException(e);
+			try {
+				P2Bundle bundle = findBundle(artifact.getArtifactId(), artifact.getVersion()).orElse(null);
+				if(bundle != null) {
+					return bundle.getProperties().entrySet().stream()
+						.filter(entry -> String.valueOf(entry.getKey()).startsWith("download.checksum.")) //$NON-NLS-1$
+						.map(property -> {
+							try {
+								String algorithm = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
+								String value = property.getValue();
+								Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
+								Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+								return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
+							} catch(IOException e) {
+								throw new RuntimeException(e);
+							}
+						})
+						.collect(Collectors.toList());
 				}
+			} catch(XMLException e) {
+				throw new RuntimeException(e);
 			}
 			return Collections.emptyList();
 		});
@@ -232,26 +230,23 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			Path pomOut = this.metadataScratch.resolve(artifact.getArtifactId() + "-" + artifact.getVersion() + ".pom"); //$NON-NLS-1$ //$NON-NLS-2$
 			if(!Files.exists(pomOut) && this.id.equals(artifact.getGroupId())) {
 				// Check if it exists in the artifacts.jar
-				Document artifactsXml = getArtifactsXml();
-				if(artifactsXml != null) {
-					try {
-						Element artifactNode = findArtifactNode(artifactsXml, artifact.getArtifactId(), artifact.getVersion());
-						if(artifactNode != null) {
-							// Then it's safe to make a file for it
-							Document xml = DOMUtil.createDocument();
-							Element project = DOMUtil.createElement(xml, "project"); //$NON-NLS-1$
-							DOMUtil.createElement(xml, project, "modelVersion").setTextContent("4.0.0"); //$NON-NLS-1$ //$NON-NLS-2$
-							DOMUtil.createElement(xml, project, "groupId").setTextContent(artifact.getGroupId()); //$NON-NLS-1$
-							DOMUtil.createElement(xml, project, "artifactId").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
-							DOMUtil.createElement(xml, project, "name").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
-							DOMUtil.createElement(xml, project, "version").setTextContent(artifact.getVersion()); //$NON-NLS-1$
-							try(OutputStream os = Files.newOutputStream(pomOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-								DOMUtil.serialize(os, xml, Format.defaultFormat);
-							}
+				try {
+					P2Bundle bundle = findBundle(artifact.getArtifactId(), artifact.getVersion()).orElse(null);
+					if(bundle != null) {
+						// Then it's safe to make a file for it
+						Document xml = DOMUtil.createDocument();
+						Element project = DOMUtil.createElement(xml, "project"); //$NON-NLS-1$
+						DOMUtil.createElement(xml, project, "modelVersion").setTextContent("4.0.0"); //$NON-NLS-1$ //$NON-NLS-2$
+						DOMUtil.createElement(xml, project, "groupId").setTextContent(artifact.getGroupId()); //$NON-NLS-1$
+						DOMUtil.createElement(xml, project, "artifactId").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
+						DOMUtil.createElement(xml, project, "name").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
+						DOMUtil.createElement(xml, project, "version").setTextContent(artifact.getVersion()); //$NON-NLS-1$
+						try(OutputStream os = Files.newOutputStream(pomOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+							DOMUtil.serialize(os, xml, Format.defaultFormat);
 						}
-					} catch(XMLException | IOException e) {
-						throw new RuntimeException(e);
 					}
+				} catch(XMLException | IOException e) {
+					throw new RuntimeException(e);
 				}
 			}
 			return pomOut;
@@ -262,70 +257,56 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		return this.metadatas.computeIfAbsent(metadata.getArtifactId(), key -> {
 			Path metadataOut = this.metadataScratch.resolve("maven-metadata-" + metadata.getArtifactId() + ".xml"); //$NON-NLS-1$ //$NON-NLS-2$
 			if(!Files.exists(metadataOut) && this.id.equals(metadata.getGroupId())) {
-				Document artifactsXml = getArtifactsXml();
-				if(artifactsXml != null) {
-					// Create a temporary maven-metadata.xml
-					try {
-						List<Element> artifactNodes = findArtifactNodes(artifactsXml, metadata.getArtifactId());
-						if(!artifactNodes.isEmpty()) {
-							
-							Document result = DOMUtil.createDocument();
-							Element metadataNode = DOMUtil.createElement(result, "metadata"); //$NON-NLS-1$
-							DOMUtil.createElement(result, metadataNode, "groupId").setTextContent(this.id); //$NON-NLS-1$
-							DOMUtil.createElement(result, metadataNode, "artifactId").setTextContent(metadata.getArtifactId()); //$NON-NLS-1$
-							Element versioning = DOMUtil.createElement(result, metadataNode, "versioning"); //$NON-NLS-1$
-							Element versions = DOMUtil.createElement(result, versioning, "versions"); //$NON-NLS-1$
+				// Create a temporary maven-metadata.xml
+				try {
+					List<P2Bundle> bundles = findBundles(metadata.getArtifactId());
+					if(!bundles.isEmpty()) {
+						
+						Document result = DOMUtil.createDocument();
+						Element metadataNode = DOMUtil.createElement(result, "metadata"); //$NON-NLS-1$
+						DOMUtil.createElement(result, metadataNode, "groupId").setTextContent(this.id); //$NON-NLS-1$
+						DOMUtil.createElement(result, metadataNode, "artifactId").setTextContent(metadata.getArtifactId()); //$NON-NLS-1$
+						Element versioning = DOMUtil.createElement(result, metadataNode, "versioning"); //$NON-NLS-1$
+						Element versions = DOMUtil.createElement(result, versioning, "versions"); //$NON-NLS-1$
 
-							for(Element artifactNode : artifactNodes) {
-								String version = artifactNode.getAttribute("version"); //$NON-NLS-1$
-								DOMUtil.createElement(result, versions, "version").setTextContent(version); //$NON-NLS-1$
-							}
-							
-							// Just assume that the last one by string comparison is the newest for now
-							String latestVersion = artifactNodes.stream()
-								.map(el -> el.getAttribute("version")) //$NON-NLS-1$
-								.map(Version::new)
-								.sorted(Comparator.reverseOrder())
-								.map(String::valueOf)
-								.findFirst()
-								.orElse(null);
-							DOMUtil.createElement(result, versioning, "latest").setTextContent(latestVersion); //$NON-NLS-1$
-							DOMUtil.createElement(result, versioning, "release").setTextContent(latestVersion); //$NON-NLS-1$
-							
-							try(OutputStream os = Files.newOutputStream(metadataOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-								DOMUtil.serialize(os, result, Format.defaultFormat);
-							}
+						for(P2Bundle bundle : bundles) {
+							DOMUtil.createElement(result, versions, "version").setTextContent(bundle.getVersion()); //$NON-NLS-1$
 						}
-					} catch(IOException | XMLException e) {
-						throw new RuntimeException(e);
+						
+						// Just assume that the last one by string comparison is the newest for now
+						String latestVersion = bundles.stream()
+							.map(P2Bundle::getVersion)
+							.map(Version::new)
+							.sorted(Comparator.reverseOrder())
+							.map(String::valueOf)
+							.findFirst()
+							.orElse(null);
+						DOMUtil.createElement(result, versioning, "latest").setTextContent(latestVersion); //$NON-NLS-1$
+						DOMUtil.createElement(result, versioning, "release").setTextContent(latestVersion); //$NON-NLS-1$
+						
+						try(OutputStream os = Files.newOutputStream(metadataOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+							DOMUtil.serialize(os, result, Format.defaultFormat);
+						}
 					}
+				} catch(IOException | XMLException e) {
+					throw new RuntimeException(e);
 				}
 			}
 			return metadataOut;
 		});
 	}
 	
-	private List<Element> findArtifactNodes(Document xml, String artifactId) throws XMLException {
-		Object[] nodes = DOMUtil.nodes(xml, "/repository/artifacts/artifact[@classifier=\"osgi.bundle\"][@id=\"" + artifactId + "\"]"); //$NON-NLS-1$ //$NON-NLS-2$
-		// Filter out any with a "processing" child
-		return Stream.of(nodes)
-			.map(Element.class::cast)
-			.filter(el -> {
-				try {
-					return DOMUtil.nodes(el, "processing").length == 0; //$NON-NLS-1$
-				} catch (XMLException e) {
-					throw new RuntimeException(e);
-				}
-			})
+	private List<P2Bundle> findBundles(String artifactId) throws XMLException {
+		return getBundles().stream()
+			.filter(bundle -> StringUtil.equals(bundle.getId(), artifactId))
 			.collect(Collectors.toList());
 	}
 	
-	private Element findArtifactNode(Document xml, String artifactId, String version) throws XMLException {
-		List<Element> nodes = findArtifactNodes(xml, artifactId);
-		return nodes.stream()
-			.filter(node -> version == null || version.equals(node.getAttribute("version"))) //$NON-NLS-1$
-			.findFirst()
-			.orElse(null);
+	private Optional<P2Bundle> findBundle(String artifactId, String version) throws XMLException {
+		return getBundles().stream()
+			.filter(bundle -> StringUtil.equals(bundle.getId(), artifactId))
+			.filter(bundle -> version == null || version.equals(bundle.getVersion()))
+			.findFirst();
 	}
 	
 	private Optional<Path> getLocalJar(Artifact artifact, boolean ignoreClassifier) {
@@ -364,10 +345,10 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		return builder.toString();
 	}
 	
-	private synchronized Document getArtifactsXml() {
+	private synchronized List<P2Bundle> getBundles() {
 		if(!checkedArtifacts) {
 			this.checkedArtifacts = true;
-			if(this.artifactsJar == null) {
+			if(this.bundles == null) {
 				URI artifactsJar = URI.create(PathUtil.concat(this.url, "artifacts.jar", '/')); //$NON-NLS-1$
 				
 				try {
@@ -378,13 +359,23 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 							xml = DOMUtil.createDocument(jis);
 						}
 					}
-					this.artifactsJar = xml;
+					this.bundles = Stream.of(DOMUtil.nodes(xml, "/repository/artifacts/artifact[@classifier=\"osgi.bundle\"]")) //$NON-NLS-1$
+						.map(Element.class::cast)
+						.filter(el -> {
+							try {
+								return DOMUtil.nodes(el, "processing").length == 0; //$NON-NLS-1$
+							} catch (XMLException e) {
+								throw new RuntimeException(e);
+							}
+						})
+						.map(P2Bundle::new)
+						.collect(Collectors.toList());
 				} catch(IOException | XMLException e) {
 					throw new RuntimeException(e);
 				}
 			}
 		}
-		return this.artifactsJar;
+		return this.bundles;
 	}
 
 }
