@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openntf.maven.p2;
+package org.openntf.maven.p2.connector;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -40,6 +40,7 @@ import org.eclipse.aether.transfer.ArtifactTransferException;
 import org.eclipse.aether.transfer.ChecksumFailureException;
 import org.eclipse.aether.transfer.MetadataNotFoundException;
 import org.eclipse.aether.transfer.MetadataTransferException;
+import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.layout.P2RepositoryLayout;
 
 import com.ibm.commons.util.StringUtil;
