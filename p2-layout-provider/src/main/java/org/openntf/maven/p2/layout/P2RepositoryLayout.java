@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.text.MessageFormat;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -42,6 +43,7 @@ import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
 import org.eclipse.aether.spi.log.Logger;
 import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.model.P2Bundle;
+import org.openntf.maven.p2.model.P2BundleManifest;
 import org.openntf.maven.p2.model.P2Repository;
 import org.osgi.framework.Version;
 import org.w3c.dom.Document;
@@ -225,7 +227,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						// Then it's safe to make a file for it
 						Document xml = DOMUtil.createDocument();
 
-						xml.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.commentSynthesizedBy"), getClass().getName()))); //$NON-NLS-1$
+						xml.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.commentSynthesizedBy"), getClass().getName(), ZonedDateTime.now()))); //$NON-NLS-1$
 						xml.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.commentSource"), bundle.getUri(null)))); //$NON-NLS-1$
 						
 						Element project = (Element)xml.appendChild(xml.createElement("project")); //$NON-NLS-1$
@@ -234,6 +236,14 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						DOMUtil.createElement(xml, project, "artifactId").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
 						DOMUtil.createElement(xml, project, "name").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
 						DOMUtil.createElement(xml, project, "version").setTextContent(artifact.getVersion()); //$NON-NLS-1$
+						
+						// Look for additional information to be gleaned from the bundle manifest
+						Path jar = getLocalJar(artifact, true).orElse(null);
+						if(jar != null) {
+							P2BundleManifest manifest = new P2BundleManifest(jar);
+							
+							addBundleMetadata(project, manifest);
+						}
 						
 						try(OutputStream os = Files.newOutputStream(pomOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 							DOMUtil.serialize(os, xml, Format.defaultFormat);
@@ -246,6 +256,34 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			return pomOut;
 		});
 	}
+	
+	private static void addBundleMetadata(Element project, P2BundleManifest manifest) {
+		Document xml = project.getOwnerDocument();
+		String bundleName = manifest.get("Bundle-Name"); //$NON-NLS-1$
+		if(StringUtil.isNotEmpty(bundleName)) {
+			DOMUtil.createElement(xml, project, "name").setTextContent(bundleName); //$NON-NLS-1$
+		}
+		String bundleDescription = manifest.get("Bundle-Description"); //$NON-NLS-1$
+		if(StringUtil.isNotEmpty(bundleDescription)) {
+			DOMUtil.createElement(xml, project, "description").setTextContent(bundleDescription); //$NON-NLS-1$
+		}
+		String bundleLicense = manifest.get("Bundle-License"); //$NON-NLS-1$
+		if(StringUtil.isNotEmpty(bundleLicense)) {
+			Element licenses = DOMUtil.createElement(xml, project, "licenses"); //$NON-NLS-1$
+			Element license = DOMUtil.createElement(xml, licenses, "license"); //$NON-NLS-1$
+			DOMUtil.createElement(xml, license, "url").setTextContent(bundleLicense); //$NON-NLS-1$
+		}
+		String bundleVendor = manifest.get("Bundle-Vendor"); //$NON-NLS-1$
+		if(StringUtil.isNotEmpty(bundleVendor)) {
+			Element organization = DOMUtil.createElement(xml, project, "organization"); //$NON-NLS-1$
+			DOMUtil.createElement(xml, organization, "name").setTextContent(bundleVendor); //$NON-NLS-1$
+		}
+		String bundleCopyright = manifest.get("Bundle-Copyright"); //$NON-NLS-1$
+		if(StringUtil.isNotEmpty(bundleCopyright)) {
+			project.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.copyrightComment"), bundleCopyright))); //$NON-NLS-1$
+		}
+	}
+
 	
 	private Path getMetadata(Metadata metadata) {
 		return this.metadatas.computeIfAbsent(metadata.getArtifactId(), key -> {
