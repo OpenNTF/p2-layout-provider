@@ -47,7 +47,6 @@ import org.osgi.framework.Version;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import com.ibm.commons.util.PathUtil;
 import com.ibm.commons.util.StringUtil;
 import com.ibm.commons.xml.DOMUtil;
 import com.ibm.commons.xml.Format;
@@ -57,20 +56,18 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private final Logger log;
 
 	private String id;
-	private String url;
 	private final P2Repository p2Repo;
 	private Path metadataScratch;
 	
 	private Map<String, Path> poms = new HashMap<>();
 	private Map<String, Path> metadatas = new HashMap<>();
 	private Map<Artifact, List<Checksum>> checksums = new HashMap<>();
-	private Map<String, Path> localJars = new HashMap<>();
+	private Map<P2Bundle, Path> localJars = new HashMap<>();
 
 	public P2RepositoryLayout(String id, String url, Logger log) throws IOException {
 		this.id = id;
-		this.url = url;
 		this.log = log;
-		this.p2Repo = new P2Repository(URI.create(url));
+		this.p2Repo = P2Repository.getInstance(URI.create(url));
 		this.metadataScratch = Files.createTempDirectory(getClass().getName() + '-' + id + "-metadata"); //$NON-NLS-1$
 	}
 
@@ -88,15 +85,15 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			// Check for classifier
 			switch(StringUtil.toString(artifact.getClassifier())) {
 			case "sources": { //$NON-NLS-1$
-				String jar = artifact.getArtifactId() + ".source_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$
-				String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
-				return URI.create(url);
+				return findBundle(artifact.getArtifactId(), artifact.getVersion())
+					.map(bundle -> bundle.getUri("source")) //$NON-NLS-1$
+					.orElse(fakeUri());
 			}
 			case "javadoc": { //$NON-NLS-1$
 				// TODO determine if there's a true standard to follow here
-				String jar = artifact.getArtifactId() + ".javadoc_" + artifact.getVersion() + ".jar"; //$NON-NLS-1$ //$NON-NLS-2$
-				String url = PathUtil.concat(this.url, "plugins/" + jar, '/'); //$NON-NLS-1$
-				return URI.create(url);
+				return findBundle(artifact.getArtifactId(), artifact.getVersion())
+						.map(bundle -> bundle.getUri("javadoc")) //$NON-NLS-1$
+						.orElse(fakeUri());
 			}
 			case "": { //$NON-NLS-1$
 				// Then it's just the jar
@@ -141,26 +138,22 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				return Collections.emptyList();
 			}
 			
-			try {
-				P2Bundle bundle = findBundle(artifact.getArtifactId(), artifact.getVersion()).orElse(null);
-				if(bundle != null) {
-					return bundle.getProperties().entrySet().stream()
-						.filter(entry -> String.valueOf(entry.getKey()).startsWith("download.checksum.")) //$NON-NLS-1$
-						.map(property -> {
-							try {
-								String algorithm = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
-								String value = property.getValue();
-								Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
-								Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-								return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
-							} catch(IOException e) {
-								throw new RuntimeException(e);
-							}
-						})
-						.collect(Collectors.toList());
-				}
-			} catch(XMLException e) {
-				throw new RuntimeException(e);
+			P2Bundle bundle = findBundle(artifact.getArtifactId(), artifact.getVersion()).orElse(null);
+			if(bundle != null) {
+				return bundle.getProperties().entrySet().stream()
+					.filter(entry -> String.valueOf(entry.getKey()).startsWith("download.checksum.")) //$NON-NLS-1$
+					.map(property -> {
+						try {
+							String algorithm = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
+							String value = property.getValue();
+							Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
+							Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+							return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
+						} catch(IOException e) {
+							throw new RuntimeException(e);
+						}
+					})
+					.collect(Collectors.toList());
 			}
 			return Collections.emptyList();
 		});
@@ -292,13 +285,13 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		});
 	}
 	
-	private List<P2Bundle> findBundles(String artifactId) throws XMLException {
+	private List<P2Bundle> findBundles(String artifactId) {
 		return this.p2Repo.getBundles().stream()
 			.filter(bundle -> StringUtil.equals(bundle.getId(), artifactId))
 			.collect(Collectors.toList());
 	}
 	
-	private Optional<P2Bundle> findBundle(String artifactId, String version) throws XMLException {
+	private Optional<P2Bundle> findBundle(String artifactId, String version) {
 		return this.p2Repo.getBundles().stream()
 			.filter(bundle -> StringUtil.equals(bundle.getId(), artifactId))
 			.filter(bundle -> version == null || version.equals(bundle.getVersion()))
@@ -306,21 +299,23 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	}
 	
 	private Optional<Path> getLocalJar(Artifact artifact, boolean ignoreClassifier) {
-		String jar = toFileName(artifact, ignoreClassifier);
-		return Optional.ofNullable(localJars.computeIfAbsent(jar, key -> {
-			String url = PathUtil.concat(this.url, "plugins/" + key, '/'); //$NON-NLS-1$
-			URI uri = URI.create(url);
-			try(InputStream is = uri.toURL().openStream()) {
-				Path localJar = this.metadataScratch.resolve(jar);
-				Files.copy(is, localJar, StandardCopyOption.REPLACE_EXISTING);
-				return localJar;
-			} catch(FileNotFoundException e) {
-				// 404
-				return null;
-			} catch(IOException e) {
-				throw new RuntimeException(e);
-			}
-		}));
+		return findBundle(artifact.getArtifactId(), artifact.getVersion())
+			.map(bundle -> {
+				return localJars.computeIfAbsent(bundle, key -> {
+					String jar = toFileName(artifact, ignoreClassifier);
+					
+					try(InputStream is = bundle.getUri(ignoreClassifier ? null : artifact.getClassifier()).toURL().openStream()) {
+						Path localJar = this.metadataScratch.resolve(jar);
+						Files.copy(is, localJar, StandardCopyOption.REPLACE_EXISTING);
+						return localJar;
+					} catch(FileNotFoundException e) {
+						// 404
+						return null;
+					} catch(IOException e) {
+						throw new RuntimeException(e);
+					}
+				});
+			});
 	}
 	
 	private String toFileName(Artifact artifact, boolean ignoreClassifier) {

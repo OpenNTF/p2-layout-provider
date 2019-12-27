@@ -15,6 +15,7 @@
  */
 package org.openntf.maven.p2.model;
 
+import java.net.URI;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,6 +23,7 @@ import java.util.stream.Stream;
 
 import org.w3c.dom.Element;
 
+import com.ibm.commons.util.StringUtil;
 import com.ibm.commons.xml.DOMUtil;
 import com.ibm.commons.xml.XMLException;
 
@@ -33,11 +35,13 @@ import com.ibm.commons.xml.XMLException;
  * @since 1.0.0
  */
 public class P2Bundle {
+	private final URI baseUri;
 	private final String id;
 	private final String version;
 	private final Map<String, String> properties;
 	
-	public P2Bundle(Element element) {
+	public P2Bundle(URI baseUri, Element element) {
+		this.baseUri = baseUri;
 		this.id = element.getAttribute("id"); //$NON-NLS-1$
 		this.version = element.getAttribute("version"); //$NON-NLS-1$
 		try {
@@ -71,5 +75,22 @@ public class P2Bundle {
 	 */
 	public Map<String, String> getProperties() {
 		return Collections.unmodifiableMap(properties);
+	}
+	
+	public URI getUri(String classifier) {
+		StringBuilder result = new StringBuilder();
+		result.append(this.baseUri.toString());
+		result.append("/plugins/"); //$NON-NLS-1$
+		result.append(this.id);
+		if("sources".equals(classifier)) { //$NON-NLS-1$
+			result.append(".source"); //$NON-NLS-1$
+		} else if(StringUtil.isNotEmpty(classifier)) {
+			result.append('.');
+			result.append(classifier);
+		}
+		result.append('_');
+		result.append(version);
+		result.append(".jar"); //$NON-NLS-1$
+		return URI.create(result.toString());
 	}
 }

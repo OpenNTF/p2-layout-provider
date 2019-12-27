@@ -5,8 +5,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.jar.JarInputStream;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.compress.compressors.CompressorException;
@@ -26,11 +29,18 @@ import com.ibm.commons.xml.XMLException;
  * @since 1.0.0
  */
 public class P2Repository {
+	private static final Map<URI, P2Repository> instances = new HashMap<>();
+	
+	public static P2Repository getInstance(URI uri) {
+		return instances.computeIfAbsent(uri, P2Repository::new);
+	}
+	
 	private final URI uri;
 	private List<P2Bundle> bundles;
 
-	public P2Repository(URI uri) {
-		this.uri = uri;
+	private P2Repository(URI uri) {
+		String baseUri = uri.toString();
+		this.uri = URI.create(baseUri.endsWith("/") ? baseUri : (baseUri+"/")); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 	
 	/**
@@ -45,10 +55,23 @@ public class P2Repository {
 			this.bundles = new ArrayList<>();
 			
 			try {
+				// Check if this is a composite repository
+				InputStream compositeArtifacts = findXml(this.uri, "compositeArtifacts"); //$NON-NLS-1$
+				if(compositeArtifacts != null) {
+					try {
+						resolveCompositeChildren(compositeArtifacts, this.uri).stream()
+							.map(P2Repository::getBundles)
+							.forEach(this.bundles::addAll);
+					} finally {
+						StreamUtil.close(compositeArtifacts);
+					}
+				}
+				
+				// Check if this is a single repository
 				InputStream artifactsXml = findXml(this.uri, "artifacts"); //$NON-NLS-1$
 				if(artifactsXml != null) {
 					try {
-						collectBundles(artifactsXml, this.bundles);
+						collectBundles(artifactsXml, this.bundles, this.uri);
 					} finally {
 						StreamUtil.close(artifactsXml);
 					}
@@ -93,7 +116,7 @@ public class P2Repository {
 		return null;
 	}
 	
-	private static void collectBundles(InputStream is, List<P2Bundle> bundles) throws XMLException {
+	private static void collectBundles(InputStream is, List<P2Bundle> bundles, URI base) throws XMLException {
 		Document artifactsXml = DOMUtil.createDocument(is);
 		Stream.of(DOMUtil.nodes(artifactsXml, "/repository/artifacts/artifact[@classifier=\"osgi.bundle\"]")) //$NON-NLS-1$
 			.map(Element.class::cast)
@@ -104,8 +127,18 @@ public class P2Repository {
 					throw new RuntimeException(e);
 				}
 			})
-			.map(P2Bundle::new)
+			.map(el -> new P2Bundle(base, el))
 			.forEach(bundles::add);
+	}
+	
+	private static List<P2Repository> resolveCompositeChildren(InputStream is, URI baseUri) throws XMLException {
+		Document compositeArtifacts = DOMUtil.createDocument(is);
+		return Stream.of(DOMUtil.nodes(compositeArtifacts, "/repository/children/child")) //$NON-NLS-1$
+			.map(Element.class::cast)
+			.map(el -> el.getAttribute("location")) //$NON-NLS-1$
+			.map(location -> baseUri.resolve(location))
+			.map(P2Repository::getInstance)
+			.collect(Collectors.toList());
 	}
 	
 }
