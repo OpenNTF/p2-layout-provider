@@ -52,9 +52,13 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 </project>
 ```
 
+### Dependency Handling
+
+When generating Poms for the p2 artifacts, this provider created `<dependency>` entries for bundles referenced in `Require-Bundle` headers that are contained within the same repository, as well as for embedded Jars within the same bundle.
+
 ### Embedded Jars
 
-To access a Jar embedded inside an OSGi artifact, use the embedded Jar's base name as a classifier:
+To access a Jar embedded inside an OSGi artifact directly, use the embedded Jar's base name as a classifier:
 
 ```xml
 <dependency>
