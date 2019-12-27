@@ -56,7 +56,8 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	
 	private final RemoteRepository repository;
 	private final P2RepositoryLayout layout;
-	private final ExecutorService executor = Executors.newCachedThreadPool();
+	// Use a single thread for now to avoid observed inconsistent behavior
+	private final ExecutorService executor = Executors.newSingleThreadExecutor();
 	private boolean closed;
 	
 	public P2RepositoryConnector(RepositorySystemSession session, RemoteRepository repository, Logger logger) {
