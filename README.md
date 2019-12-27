@@ -26,7 +26,7 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 	<repositories>
 		<repository>
 			<id>org.eclipse.p2.repo</id>   <!-- defines the groupId to be used below -->
-			<url>http://download.eclipse.org/releases/2019-12/201912181000</url>
+			<url>http://download.eclipse.org/releases/2019-12</url>
 			<layout>p2</layout>
 		</repository>
 	</repositories>
@@ -44,7 +44,7 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 			<plugin>
 				<groupId>org.openntf.maven</groupId>
 				<artifactId>p2-layout-resolver</artifactId>
-				<version>1.0.0-SNAPSHOT</version>
+				<version>1.0.0</version>
 				<extensions>true</extensions>
 			</plugin>
 		</plugins>
