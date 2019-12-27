@@ -170,6 +170,7 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	
 	private void download(URI source, Path dest) throws FileNotFoundException, IOException {
 		try(InputStream is = source.toURL().openStream()) {
+			Files.createDirectories(dest.getParent());
 			Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
 		}
 	}
