@@ -23,7 +23,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.eclipse.aether.RepositorySystemSession;
@@ -50,6 +56,7 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	
 	private final RemoteRepository repository;
 	private final P2RepositoryLayout layout;
+	private final ExecutorService executor = Executors.newCachedThreadPool();
 	private boolean closed;
 	
 	public P2RepositoryConnector(RepositorySystemSession session, RemoteRepository repository, Logger logger) {
@@ -72,39 +79,56 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			log.debug(MessageFormat.format(Messages.getString("P2RepositoryConnector.getCommandDownloads"), artifactDownloads)); //$NON-NLS-1$
 			log.debug(MessageFormat.format(Messages.getString("P2RepositoryConnector.getCommandMetadata"), metadataDownloads)); //$NON-NLS-1$
 		}
-		// TODO see if this should be routed through the session and/or multithreaded
+		
+		List<Callable<Void>> downloads = new ArrayList<>();
+		
 		if(artifactDownloads != null) {
-			for(ArtifactDownload download : artifactDownloads) {
-				Path dest = download.getFile().toPath();
-				URI sourceUri = layout.getLocation(download.getArtifact(), false);
-				try {
-					download(sourceUri, dest);
-					
-					for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, sourceUri)) {
-						String ext = checksum.getAlgorithm().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
-						Path checksumPath = dest.getParent().resolve(dest.getFileName().toString()+"."+ext); //$NON-NLS-1$
-						download(sourceUri.resolve(checksum.getLocation()), checksumPath);
+			artifactDownloads.stream()
+				.map(download -> (Callable<Void>)() -> {
+					Path dest = download.getFile().toPath();
+					URI sourceUri = layout.getLocation(download.getArtifact(), false);
+					try {
+						download(sourceUri, dest);
 						
-						verifyChecksum(dest, checksumPath, checksum.getAlgorithm());
+						for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, sourceUri)) {
+							String ext = checksum.getAlgorithm().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
+							Path checksumPath = dest.getParent().resolve(dest.getFileName().toString()+"."+ext); //$NON-NLS-1$
+							download(sourceUri.resolve(checksum.getLocation()), checksumPath);
+							
+							verifyChecksum(dest, checksumPath, checksum.getAlgorithm());
+						}
+					} catch(FileNotFoundException e) {
+						download.setException(new ArtifactNotFoundException(download.getArtifact(), repository, Messages.getString("P2RepositoryConnector.artifactNotFound"), e)); //$NON-NLS-1$
+					} catch(Exception e) {
+						download.setException(new ArtifactTransferException(download.getArtifact(), repository, Messages.getString("P2RepositoryConnector.exceptionTransferringArtifact"), e)); //$NON-NLS-1$
 					}
-				} catch(FileNotFoundException e) {
-					download.setException(new ArtifactNotFoundException(download.getArtifact(), repository, Messages.getString("P2RepositoryConnector.artifactNotFound"), e)); //$NON-NLS-1$
-				} catch(Exception e) {
-					download.setException(new ArtifactTransferException(download.getArtifact(), repository, Messages.getString("P2RepositoryConnector.exceptionTransferringArtifact"), e)); //$NON-NLS-1$
-				}
-			}
+					return null;
+				})
+				.forEach(downloads::add);
 		}
+		
 		if(metadataDownloads != null) {
-			for(MetadataDownload download : metadataDownloads) {
-				Path dest = download.getFile().toPath();
-				URI sourceUri = layout.getLocation(download.getMetadata(), false);
-				try {
-					download(sourceUri, dest);
-				} catch(FileNotFoundException e) {
-					download.setException(new MetadataNotFoundException(download.getMetadata(), repository, Messages.getString("P2RepositoryConnector.metadataNotFound"), e)); //$NON-NLS-1$
-				} catch(Exception e) {
-					download.setException(new MetadataTransferException(download.getMetadata(), repository, Messages.getString("P2RepositoryConnector.exceptionTransferringMetadata"), e)); //$NON-NLS-1$
-				}
+			metadataDownloads.stream()
+				.map(download -> (Callable<Void>)() -> {
+					Path dest = download.getFile().toPath();
+					URI sourceUri = layout.getLocation(download.getMetadata(), false);
+					try {
+						download(sourceUri, dest);
+					} catch(FileNotFoundException e) {
+						download.setException(new MetadataNotFoundException(download.getMetadata(), repository, Messages.getString("P2RepositoryConnector.metadataNotFound"), e)); //$NON-NLS-1$
+					} catch(Exception e) {
+						download.setException(new MetadataTransferException(download.getMetadata(), repository, Messages.getString("P2RepositoryConnector.exceptionTransferringMetadata"), e)); //$NON-NLS-1$
+					}
+					return null;
+				})
+				.forEach(downloads::add);
+		}
+		
+		try {
+			executor.invokeAll(downloads);
+		} catch (InterruptedException e) {
+			if(log.isWarnEnabled()) {
+				log.warn(MessageFormat.format(Messages.getString("P2RepositoryConnector.interruptedDownloads"), downloads.size())); //$NON-NLS-1$
 			}
 		}
 	}
@@ -120,6 +144,17 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	@Override
 	public void close() {
 		this.layout.close();
+		List<Runnable> tasks = executor.shutdownNow();
+		if(tasks != null && !tasks.isEmpty()) {
+			if(log.isWarnEnabled()) {
+				log.warn(MessageFormat.format(Messages.getString("P2RepositoryConnector.awaitingTermination"), tasks.size())); //$NON-NLS-1$
+			}
+			try {
+				executor.awaitTermination(1, TimeUnit.MINUTES);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
 		this.closed = true;
 	}
 	
