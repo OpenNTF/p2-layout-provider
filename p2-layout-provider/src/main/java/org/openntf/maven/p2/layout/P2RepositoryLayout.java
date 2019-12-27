@@ -41,11 +41,14 @@ import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.metadata.Metadata;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
 import org.eclipse.aether.spi.log.Logger;
+import org.eclipse.osgi.util.ManifestElement;
 import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.model.P2Bundle;
 import org.openntf.maven.p2.model.P2BundleManifest;
 import org.openntf.maven.p2.model.P2Repository;
+import org.osgi.framework.BundleException;
 import org.osgi.framework.Version;
+import org.osgi.framework.VersionRange;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -108,6 +111,9 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				if(localJar != null) {
 					try(ZipFile jarFile = new ZipFile(localJar.toFile())) {
 						ZipEntry classifiedEntry = jarFile.getEntry(artifact.getClassifier() + '.' + artifact.getExtension());
+						if(classifiedEntry == null) {
+							classifiedEntry = jarFile.getEntry(uncleanClassifier(artifact.getClassifier()) + '.' + artifact.getExtension());
+						}
 						if(classifiedEntry != null) {
 							return URI.create("jar:" + localJar.toUri().toString() + "!/" + classifiedEntry.getName()); //$NON-NLS-1$ //$NON-NLS-2$
 						}
@@ -225,16 +231,15 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 					P2Bundle bundle = findBundle(artifact.getArtifactId(), artifact.getVersion()).orElse(null);
 					if(bundle != null) {
 						// Then it's safe to make a file for it
-						Document xml = DOMUtil.createDocument();
+						Document xml = DOMUtil.createDocument("http://maven.apache.org/POM/4.0.0", "project"); //$NON-NLS-1$ //$NON-NLS-2$
 
 						xml.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.commentSynthesizedBy"), getClass().getName(), ZonedDateTime.now()))); //$NON-NLS-1$
 						xml.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.commentSource"), bundle.getUri(null)))); //$NON-NLS-1$
 						
-						Element project = (Element)xml.appendChild(xml.createElement("project")); //$NON-NLS-1$
+						Element project = xml.getDocumentElement();
 						DOMUtil.createElement(xml, project, "modelVersion").setTextContent("4.0.0"); //$NON-NLS-1$ //$NON-NLS-2$
 						DOMUtil.createElement(xml, project, "groupId").setTextContent(artifact.getGroupId()); //$NON-NLS-1$
 						DOMUtil.createElement(xml, project, "artifactId").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
-						DOMUtil.createElement(xml, project, "name").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
 						DOMUtil.createElement(xml, project, "version").setTextContent(artifact.getVersion()); //$NON-NLS-1$
 						
 						// Look for additional information to be gleaned from the bundle manifest
@@ -243,10 +248,15 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 							P2BundleManifest manifest = new P2BundleManifest(jar);
 							
 							addBundleMetadata(project, manifest);
+							addBundleDependencies(project, artifact, manifest);
 						}
 						
+						project.setAttribute("xmlns", "http://maven.apache.org/POM/4.0.0"); //$NON-NLS-1$ //$NON-NLS-2$
+						project.setAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance"); //$NON-NLS-1$ //$NON-NLS-2$
+						project.setAttribute("xsi:schemaLocation", "http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"); //$NON-NLS-1$ //$NON-NLS-2$
+						
 						try(OutputStream os = Files.newOutputStream(pomOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-							DOMUtil.serialize(os, xml, Format.defaultFormat);
+							DOMUtil.serialize(os, xml, new Format(2, false, "UTF-8")); //$NON-NLS-1$
 						}
 					}
 				} catch(XMLException | IOException e) {
@@ -295,6 +305,67 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		}
 	}
 
+	private void addBundleDependencies(Element project, Artifact artifact, P2BundleManifest manifest) {
+		Document xml = project.getOwnerDocument();
+		Element dependencies = null;
+		
+		String requireBundle = manifest.get("Require-Bundle"); //$NON-NLS-1$
+		if(StringUtil.isNotEmpty(requireBundle)) {
+			dependencies = DOMUtil.createElement(xml, project, "dependencies"); //$NON-NLS-1$
+			
+			try {
+				for(ManifestElement el : ManifestElement.parseHeader("Require-Bundle", requireBundle)) { //$NON-NLS-1$
+					String bundleName = el.getValue();
+					String v = el.getAttribute("bundle-version"); //$NON-NLS-1$
+					VersionRange versionRange = StringUtil.isEmpty(v) ? null : new VersionRange(v);
+					
+					P2Bundle dep = this.p2Repo.getBundles().stream()
+						.filter(bundle -> StringUtil.equals(bundleName, bundle.getId()))
+						.filter(bundle -> versionRange == null || versionRange.includes(new Version(bundle.getVersion())))
+						.findFirst()
+						.orElse(null);
+					if(dep != null) {
+						Element dependency = DOMUtil.createElement(xml, dependencies, "dependency"); //$NON-NLS-1$
+						DOMUtil.createElement(xml, dependency, "groupId").setTextContent(this.id); //$NON-NLS-1$
+						DOMUtil.createElement(xml, dependency, "artifactId").setTextContent(dep.getId()); //$NON-NLS-1$
+						DOMUtil.createElement(xml, dependency, "version").setTextContent(dep.getVersion()); //$NON-NLS-1$
+					}
+				}
+			} catch (BundleException e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		Path localJar = getLocalJar(artifact, true).orElse(null);
+		if(localJar != null) {
+			String bundleClassPath = manifest.get("Bundle-ClassPath"); //$NON-NLS-1$
+			if(StringUtil.isNotEmpty(bundleClassPath)) {
+				if(dependencies == null) {
+					dependencies = DOMUtil.createElement(xml, project, "dependencies"); //$NON-NLS-1$
+				}
+				try {
+					for(ManifestElement el : ManifestElement.parseHeader("Bundle-ClassPath", bundleClassPath)) { //$NON-NLS-1$
+						String cpName = el.getValue();
+						if(StringUtil.isEmpty(cpName) || ".".equals(cpName)) { //$NON-NLS-1$
+							continue;
+						}
+						
+						if(cpName.toLowerCase().endsWith(".jar")) { //$NON-NLS-1$
+							cpName = cpName.substring(0, cpName.length()-4);
+						}
+
+						Element dependency = DOMUtil.createElement(xml, dependencies, "dependency"); //$NON-NLS-1$
+						DOMUtil.createElement(xml, dependency, "groupId").setTextContent(this.id); //$NON-NLS-1$
+						DOMUtil.createElement(xml, dependency, "artifactId").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
+						DOMUtil.createElement(xml, dependency, "version").setTextContent(artifact.getVersion()); //$NON-NLS-1$
+						DOMUtil.createElement(xml, dependency, "classifier").setTextContent(cleanClassifier(cpName)); //$NON-NLS-1$
+					}
+				} catch (BundleException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+	}
 	
 	private Path getMetadata(Metadata metadata) {
 		return this.metadatas.computeIfAbsent(metadata.getArtifactId(), key -> {
@@ -388,5 +459,18 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		builder.append('.');
 		builder.append(artifact.getExtension());
 		return builder.toString();
+	}
+	
+	private static String cleanClassifier(String classifier) {
+		if(classifier == null) {
+			return null;
+		}
+		return classifier.replace('/', '$');
+	}
+	private static String uncleanClassifier(String classifier) {
+		if(classifier == null) {
+			return null;
+		}
+		return classifier.replace('$', '/');
 	}
 }
