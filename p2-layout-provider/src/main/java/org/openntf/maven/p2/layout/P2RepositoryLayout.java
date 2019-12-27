@@ -282,6 +282,17 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		if(StringUtil.isNotEmpty(bundleCopyright)) {
 			project.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.copyrightComment"), bundleCopyright))); //$NON-NLS-1$
 		}
+		String bundleDocUrl = manifest.get("Bundle-DocURL"); //$NON-NLS-1$
+		if(StringUtil.isNotEmpty(bundleDocUrl)) {
+			DOMUtil.createElement(xml, project, "url").setTextContent(bundleDocUrl); //$NON-NLS-1$
+		}
+		String sourceRef = manifest.get("Eclipse-SourceReferences"); //$NON-NLS-1$
+		if(StringUtil.isNotEmpty(sourceRef)) {
+			// Only use the first
+			sourceRef = StringUtil.splitString(sourceRef, ',')[0];
+			Element scm = DOMUtil.createElement(xml, project, "scm"); //$NON-NLS-1$
+			DOMUtil.createElement(xml, scm, "url").setTextContent(sourceRef); //$NON-NLS-1$
+		}
 	}
 
 	
