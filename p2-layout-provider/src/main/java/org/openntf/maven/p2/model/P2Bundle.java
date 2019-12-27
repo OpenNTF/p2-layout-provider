@@ -80,7 +80,7 @@ public class P2Bundle {
 	public URI getUri(String classifier) {
 		StringBuilder result = new StringBuilder();
 		result.append(this.baseUri.toString());
-		result.append("/plugins/"); //$NON-NLS-1$
+		result.append("plugins/"); //$NON-NLS-1$
 		result.append(this.id);
 		if("sources".equals(classifier)) { //$NON-NLS-1$
 			result.append(".source"); //$NON-NLS-1$

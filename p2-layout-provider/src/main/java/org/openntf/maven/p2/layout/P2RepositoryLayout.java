@@ -224,12 +224,17 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 					if(bundle != null) {
 						// Then it's safe to make a file for it
 						Document xml = DOMUtil.createDocument();
-						Element project = DOMUtil.createElement(xml, "project"); //$NON-NLS-1$
+
+						xml.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.commentSynthesizedBy"), getClass().getName()))); //$NON-NLS-1$
+						xml.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.commentSource"), bundle.getUri(null)))); //$NON-NLS-1$
+						
+						Element project = (Element)xml.appendChild(xml.createElement("project")); //$NON-NLS-1$
 						DOMUtil.createElement(xml, project, "modelVersion").setTextContent("4.0.0"); //$NON-NLS-1$ //$NON-NLS-2$
 						DOMUtil.createElement(xml, project, "groupId").setTextContent(artifact.getGroupId()); //$NON-NLS-1$
 						DOMUtil.createElement(xml, project, "artifactId").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
 						DOMUtil.createElement(xml, project, "name").setTextContent(artifact.getArtifactId()); //$NON-NLS-1$
 						DOMUtil.createElement(xml, project, "version").setTextContent(artifact.getVersion()); //$NON-NLS-1$
+						
 						try(OutputStream os = Files.newOutputStream(pomOut, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 							DOMUtil.serialize(os, xml, Format.defaultFormat);
 						}
