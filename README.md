@@ -65,6 +65,17 @@ To access a Jar embedded inside an OSGi artifact, use the embedded Jar's base na
 </dependency>
 ```
 
+If the embedded Jar is within a directory, it should be referenced with a "$" in place of the "/":
+
+```xml
+<dependency>
+    <groupId>some.repo.id</groupId>
+    <artifactId>some.artifact</artifactId>
+    <version>[1.0.0,)</version>
+    <classifier>lib$example.embedded</classifier>   <!-- matches lib/example.embedded.jar -->
+</dependency>
+```
+
 ### Sources
 
 This provider handles source Jars by looking for a bundle of the same artifact ID plus ".source" when asked for the "sources" classifier.
