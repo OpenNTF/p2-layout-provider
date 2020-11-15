@@ -72,14 +72,27 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	public P2RepositoryLayout(String id, String url, Logger log) throws IOException {
 		this.id = id;
 		this.log = log;
-		this.p2Repo = P2Repository.getInstance(URI.create(url));
-		this.metadataScratch = Files.createTempDirectory(getClass().getName() + '-' + id + "-metadata"); //$NON-NLS-1$
+		P2Repository repo;
+		try {
+			repo = P2Repository.getInstance(URI.create(url));
+			this.metadataScratch = Files.createTempDirectory(getClass().getName() + '-' + id + "-metadata"); //$NON-NLS-1$
+		} catch(IllegalArgumentException e) {
+			// This almost definitely means that the runtime hasn't interpolated a ${} property yet
+			if(log.isWarnEnabled()) {
+				log.warn("Skipping initialization of P2RepositoryLayout due to uninterpretable URL", e);
+			}
+			repo = null;
+		}
+		this.p2Repo = repo;
 	}
 
 	@Override
 	public URI getLocation(Artifact artifact, boolean upload) {
 		if(log.isDebugEnabled()) {
 			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayout.getLocationArtifact"), artifact)); //$NON-NLS-1$
+		}
+		if(this.p2Repo == null) {
+			return null;
 		}
 		
 		switch(String.valueOf(artifact.getExtension())) {
@@ -135,12 +148,18 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		if(log.isDebugEnabled()) {
 			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayout.getLocationMetadata"), metadata)); //$NON-NLS-1$
 		}
+		if(this.p2Repo == null) {
+			return null;
+		}
 		
 		return getMetadata(metadata).toUri();
 	}
 
 	@Override
 	public List<Checksum> getChecksums(Artifact artifact, boolean upload, URI location) {
+		if(this.p2Repo == null) {
+			return null;
+		}
 		return this.checksums.computeIfAbsent(artifact, key -> {
 			if(!"jar".equals(key.getExtension()) || StringUtil.isNotEmpty(artifact.getClassifier())) { //$NON-NLS-1$
 				return Collections.emptyList();
@@ -208,7 +227,9 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			}
 		}
 		try {
-			Files.deleteIfExists(this.metadataScratch);
+			if(this.metadataScratch != null) {
+				Files.deleteIfExists(this.metadataScratch);
+			}
 		} catch (IOException e) {
 			// Ignore
 		}
