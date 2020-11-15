@@ -5,6 +5,7 @@
 	<groupId>org.openntf.maven</groupId>
 	<artifactId>p2-layout-resolver</artifactId>
 	<version>1.2.0-SNAPSHOT</version>
+	<packaging>maven-plugin</packaging>
 
 	<name>p2 Repository Resolver</name>
 	<inceptionYear>2019</inceptionYear>
@@ -146,6 +147,14 @@
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-site-plugin</artifactId>
 					<version>3.7.1</version>
+				</plugin>
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-plugin-plugin</artifactId>
+					<version>3.6.0</version>
+					<configuration>
+						<skipErrorNoDescriptorsFound>true</skipErrorNoDescriptorsFound>
+					</configuration>
 				</plugin>
 			
 				<plugin>
