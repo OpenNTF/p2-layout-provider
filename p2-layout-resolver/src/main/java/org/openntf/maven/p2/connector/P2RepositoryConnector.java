@@ -26,6 +26,7 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -88,6 +89,9 @@ public class P2RepositoryConnector implements RepositoryConnector {
 				.map(download -> (Callable<Void>)() -> {
 					Path dest = download.getFile().toPath();
 					URI sourceUri = layout.getLocation(download.getArtifact(), false);
+					if(sourceUri == null) {
+						return null;
+					}
 					try {
 						download(sourceUri, dest);
 						
@@ -105,6 +109,7 @@ public class P2RepositoryConnector implements RepositoryConnector {
 					}
 					return null;
 				})
+				.filter(Objects::nonNull)
 				.forEach(downloads::add);
 		}
 		
