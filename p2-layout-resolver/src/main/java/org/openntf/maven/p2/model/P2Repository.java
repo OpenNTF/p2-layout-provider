@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,7 @@ import com.ibm.commons.xml.XMLException;
  * @since 1.0.0
  */
 public class P2Repository {
-	private static final Map<URI, P2Repository> instances = new HashMap<>();
+	private static final Map<URI, P2Repository> instances = Collections.synchronizedMap(new HashMap<>());
 	
 	public static P2Repository getInstance(URI uri) {
 		return instances.computeIfAbsent(uri, P2Repository::new);
