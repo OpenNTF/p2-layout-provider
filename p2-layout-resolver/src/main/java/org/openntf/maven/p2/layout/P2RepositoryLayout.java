@@ -79,7 +79,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		} catch(IllegalArgumentException e) {
 			// This almost definitely means that the runtime hasn't interpolated a ${} property yet
 			if(log.isWarnEnabled()) {
-				log.warn("Skipping initialization of P2RepositoryLayout due to uninterpretable URL", e);
+				log.warn(Messages.getString("P2RepositoryLayout.skippingUninterpretableUrl"), e); //$NON-NLS-1$
 			}
 			repo = null;
 		}
