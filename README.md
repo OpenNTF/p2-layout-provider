@@ -44,7 +44,7 @@ To use this plugin, add it to the `<build>` section of your project's Pom with `
 			<plugin>
 				<groupId>org.openntf.maven</groupId>
 				<artifactId>p2-layout-resolver</artifactId>
-				<version>1.1.0</version>
+				<version>1.2.0</version>
 				<extensions>true</extensions>
 			</plugin>
 		</plugins>
