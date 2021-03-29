@@ -279,7 +279,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						project.setAttribute("xsi:schemaLocation", "http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"); //$NON-NLS-1$ //$NON-NLS-2$
 						
 						try(Writer w = Files.newBufferedWriter(pomOut, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-							w.write(xml.getXml());
+							xml.getXml(null, w);
 						}
 					}
 				} catch(IOException | SAXException | ParserConfigurationException e) {
@@ -422,7 +422,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						versioning.addChildElement("release").setTextContent(latestVersion); //$NON-NLS-1$
 						
 						try(Writer w = Files.newBufferedWriter(metadataOut, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-							w.write(result.getXml());
+							result.getXml(null, w);
 						}
 					}
 				} catch(Throwable e) {

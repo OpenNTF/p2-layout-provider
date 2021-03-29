@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.io.StringWriter;
-import java.nio.file.Path;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -290,15 +290,13 @@ public class XMLNode implements Serializable {
 		return null;
 	}
 
-	public void getXml(Transformer transformer, final Path out) throws IOException {
+	public void getXml(Transformer transformer, final Writer w) throws IOException {
 		try {
 			if (transformer == null) {
 				transformer = DEFAULT_TRANSFORMER;
 			}
 
-			// StreamResult xResult = new StreamResult(out); - This constructor has problems with german umlauts
-			// See: http://comments.gmane.org/gmane.text.xml.saxon.help/6790
-			StreamResult result = new StreamResult(out.toUri().toString());
+			StreamResult result = new StreamResult(w);
 			DOMSource source = new DOMSource(this.node_);
 			transformer.transform(source, result);
 		} catch (Exception e) {
