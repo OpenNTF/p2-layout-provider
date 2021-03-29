@@ -19,13 +19,10 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import org.w3c.dom.Element;
+import org.openntf.maven.p2.util.xml.XMLNode;
 
 import com.ibm.commons.util.StringUtil;
-import com.ibm.commons.xml.DOMUtil;
-import com.ibm.commons.xml.XMLException;
 
 /**
  * Represents a bundle entry inside of a P2 repository, based on the containing
@@ -40,20 +37,16 @@ public class P2Bundle {
 	private final String version;
 	private final Map<String, String> properties;
 	
-	public P2Bundle(URI baseUri, Element element) {
+	public P2Bundle(URI baseUri, XMLNode element) {
 		this.baseUri = baseUri;
 		this.id = element.getAttribute("id"); //$NON-NLS-1$
 		this.version = element.getAttribute("version"); //$NON-NLS-1$
-		try {
-			this.properties = Stream.of(DOMUtil.nodes(element, "properties/property")) //$NON-NLS-1$
-				.map(Element.class::cast)
-				.collect(Collectors.toMap(
-					prop -> prop.getAttribute("name"), //$NON-NLS-1$
-					prop -> prop.getAttribute("value") //$NON-NLS-1$
-				));
-		} catch(XMLException e) {
-			throw new RuntimeException(e);
-		}
+		this.properties = element.getElementsByTagName("property") //$NON-NLS-1$
+			.stream()
+			.collect(Collectors.toMap(
+				prop -> prop.getAttribute("name"), //$NON-NLS-1$
+				prop -> prop.getAttribute("value") //$NON-NLS-1$
+			));
 	}
 
 	/**
