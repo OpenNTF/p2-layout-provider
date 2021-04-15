@@ -1,3 +1,18 @@
+/**
+ * Copyright © 2019-2021 Jesse Gallagher
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openntf.maven.p2.model;
 
 import java.io.FileNotFoundException;
@@ -11,17 +26,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.jar.JarInputStream;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
+import org.openntf.maven.p2.util.xml.XMLDocument;
+import org.xml.sax.SAXException;
 
 import com.ibm.commons.util.PathUtil;
 import com.ibm.commons.util.io.StreamUtil;
-import com.ibm.commons.xml.DOMUtil;
-import com.ibm.commons.xml.XMLException;
 
 /**
  * Represents a local or remote P2 repository root.
@@ -77,7 +91,7 @@ public class P2Repository {
 						StreamUtil.close(artifactsXml);
 					}
 				}
-			} catch(IOException | XMLException | CompressorException e) {
+			} catch(Throwable e) {
 				throw new RuntimeException(e);
 			}
 		}
@@ -117,25 +131,21 @@ public class P2Repository {
 		return null;
 	}
 	
-	private static void collectBundles(InputStream is, List<P2Bundle> bundles, URI base) throws XMLException {
-		Document artifactsXml = DOMUtil.createDocument(is);
-		Stream.of(DOMUtil.nodes(artifactsXml, "/repository/artifacts/artifact[@classifier=\"osgi.bundle\"]")) //$NON-NLS-1$
-			.map(Element.class::cast)
+	private static void collectBundles(InputStream is, List<P2Bundle> bundles, URI base) throws SAXException, IOException, ParserConfigurationException {
+		XMLDocument artifactsXml = new XMLDocument();
+		artifactsXml.loadInputStream(is);
+		artifactsXml.selectNodes("/repository/artifacts/artifact[@classifier=\"osgi.bundle\"]") //$NON-NLS-1$
 			.filter(el -> {
-				try {
-					return DOMUtil.nodes(el, "processing").length == 0; //$NON-NLS-1$
-				} catch (XMLException e) {
-					throw new RuntimeException(e);
-				}
+				return el.getElementsByTagName("processing").isEmpty(); //$NON-NLS-1$
 			})
 			.map(el -> new P2Bundle(base, el))
 			.forEach(bundles::add);
 	}
 	
-	private static List<P2Repository> resolveCompositeChildren(InputStream is, URI baseUri) throws XMLException {
-		Document compositeArtifacts = DOMUtil.createDocument(is);
-		return Stream.of(DOMUtil.nodes(compositeArtifacts, "/repository/children/child")) //$NON-NLS-1$
-			.map(Element.class::cast)
+	private static List<P2Repository> resolveCompositeChildren(InputStream is, URI baseUri) throws SAXException, IOException, ParserConfigurationException {
+		XMLDocument compositeArtifacts = new XMLDocument();
+		compositeArtifacts.loadInputStream(is);
+		return compositeArtifacts.selectNodes("/repository/children/child") //$NON-NLS-1$
 			.map(el -> el.getAttribute("location")) //$NON-NLS-1$
 			.map(location -> baseUri.resolve(location))
 			.map(P2Repository::getInstance)
