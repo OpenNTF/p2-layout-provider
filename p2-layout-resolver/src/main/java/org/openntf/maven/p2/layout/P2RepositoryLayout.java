@@ -75,7 +75,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		this.log = log;
 		P2Repository repo;
 		try {
-			repo = P2Repository.getInstance(URI.create(url));
+			repo = P2Repository.getInstance(URI.create(url), log);
 			this.metadataScratch = Files.createTempDirectory(getClass().getName() + '-' + id + "-metadata"); //$NON-NLS-1$
 		} catch(IllegalArgumentException e) {
 			// This almost definitely means that the runtime hasn't interpolated a ${} property yet
