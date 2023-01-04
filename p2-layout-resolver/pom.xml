@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.openntf.maven</groupId>
 	<artifactId>p2-layout-resolver</artifactId>
-	<version>1.4.0</version>
+	<version>1.5.0</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>p2 Repository Resolver</name>
@@ -168,7 +168,7 @@
 						</excludes>
 						<properties>
 							<owner>Jesse Gallagher</owner>
-							<copyrightYear>2021</copyrightYear>
+							<copyrightYear>2023</copyrightYear>
 						</properties>
 						<mapping>
 							<tag>DYNASCRIPT_STYLE</tag>
