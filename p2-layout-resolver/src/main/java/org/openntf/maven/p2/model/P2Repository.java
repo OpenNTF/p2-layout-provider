@@ -18,10 +18,7 @@ package org.openntf.maven.p2.model;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URI;
-import java.net.URLConnection;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,11 +34,11 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.eclipse.aether.spi.log.Logger;
+import org.openntf.maven.p2.util.P2Util;
 import org.openntf.maven.p2.util.xml.XMLDocument;
 import org.xml.sax.SAXException;
 
 import com.ibm.commons.util.PathUtil;
-import com.ibm.commons.util.StringUtil;
 import com.ibm.commons.util.io.StreamUtil;
 
 /**
@@ -119,7 +116,7 @@ public class P2Repository {
 	private static InputStream findXml(URI baseUri, String baseName) throws IOException, CompressorException {
 		URI xml = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".xml", '/')); //$NON-NLS-1$
 		try {
-			Optional<InputStream> result = openConnection(xml);
+			Optional<InputStream> result = P2Util.openConnection(xml);
 			if(result.isPresent()) {
 				return result.get();
 			}
@@ -129,7 +126,7 @@ public class P2Repository {
 		
 		URI xz = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".xml.xz", '/')); //$NON-NLS-1$
 		try {
-			Optional<InputStream> result = openConnection(xz);
+			Optional<InputStream> result = P2Util.openConnection(xz);
 			if(result.isPresent()) {
 				return CompressorStreamFactory.getSingleton().createCompressorInputStream(CompressorStreamFactory.getXz(), result.get());
 			}
@@ -139,7 +136,7 @@ public class P2Repository {
 		
 		URI jar = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".jar", '/')); //$NON-NLS-1$
 		try {
-			Optional<InputStream> result = openConnection(jar);
+			Optional<InputStream> result = P2Util.openConnection(jar);
 			if(result.isPresent()) {
 				InputStream is = result.get();
 				JarInputStream jis = new JarInputStream(is);
@@ -151,40 +148,6 @@ public class P2Repository {
 		}
 		
 		return null;
-	}
-	
-	private static Optional<InputStream> openConnection(URI uri) throws MalformedURLException, IOException {
-		try {
-			URLConnection conn = uri.toURL().openConnection();
-			if(conn instanceof HttpURLConnection) {
-				int status = ((HttpURLConnection)conn).getResponseCode();
-				switch(status) {
-				case HttpURLConnection.HTTP_MOVED_PERM:
-				case HttpURLConnection.HTTP_MOVED_TEMP:
-				case HttpURLConnection.HTTP_SEE_OTHER:
-				case 307:
-				case 308:
-					// Try handling a redirect
-					String location = ((HttpURLConnection)conn).getHeaderField("Location"); //$NON-NLS-1$
-					if(StringUtil.isNotEmpty(location)) {
-						return openConnection(uri.resolve(location));
-					} else {
-						return Optional.empty();
-					}
-				case 200:
-					// Good
-					return Optional.of(conn.getInputStream());
-				default:
-					// Assume it's an other error
-					return Optional.empty();
-				}
-			} else {
-				// For file://, etc., just try opening the connection
-				return Optional.of(conn.getInputStream());
-			}
-		} catch(FileNotFoundException e) {
-			return Optional.empty();
-		}
 	}
 	
 	private static void collectBundles(InputStream is, List<P2Bundle> bundles, URI base) throws SAXException, IOException, ParserConfigurationException {

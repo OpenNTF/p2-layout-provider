@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,6 +50,7 @@ import org.eclipse.aether.transfer.MetadataNotFoundException;
 import org.eclipse.aether.transfer.MetadataTransferException;
 import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.layout.P2RepositoryLayout;
+import org.openntf.maven.p2.util.P2Util;
 
 import com.ibm.commons.util.StringUtil;
 
@@ -182,7 +184,11 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	}
 	
 	private void download(URI source, Path dest) throws FileNotFoundException, IOException {
-		try(InputStream is = source.toURL().openStream()) {
+		Optional<InputStream> isOpt = P2Util.openConnection(source);
+		if(!isOpt.isPresent()) {
+			throw new FileNotFoundException();
+		}
+		try(InputStream is = isOpt.get()) {
 			Files.createDirectories(dest.getParent());
 			Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
 		}
