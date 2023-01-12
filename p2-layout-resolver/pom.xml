@@ -187,7 +187,7 @@
 				            <exclude>**/odp/**</exclude>
 						</excludes>
 						<properties>
-							<owner>Jesse Gallagher</owner>
+							<owner>Contributors to the P2 Layout Resolver Project</owner>
 							<copyrightYear>2023</copyrightYear>
 						</properties>
 						<mapping>
