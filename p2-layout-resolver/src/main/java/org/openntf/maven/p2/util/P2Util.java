@@ -61,4 +61,37 @@ public enum P2Util {
 			return Optional.empty();
 		}
 	}
+	
+	public static String concatPath(char sep, String path1, String path2) {
+    	if(path1 == null || path1.isEmpty()) {
+    		return path2;
+    	}
+    	if(path2 == null || path2.isEmpty()) {
+    		return path1;
+    	}
+    	StringBuilder b = new StringBuilder();
+    	if(path1.charAt(path1.length()-1)==sep) {
+    		b.append(path1,0,path1.length()-1);
+    	} else {
+    		b.append(path1);
+    	}
+    	b.append(sep);
+    	if(path2.charAt(0)==sep) {
+    		b.append(path2,1,path2.length());
+    	} else {
+    		b.append(path2);
+    	}
+    	return b.toString();
+    }
+	
+	public static String concatPath(final char delim, final String... parts) {
+		if (parts == null || parts.length == 0) {
+			return ""; //$NON-NLS-1$
+		}
+		String path = parts[0];
+		for (int i = 1; i < parts.length; i++) {
+			path = concatPath(delim, path, parts[i]);
+		}
+		return path;
+	}
 }

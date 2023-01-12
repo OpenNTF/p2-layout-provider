@@ -115,7 +115,7 @@ public class P2Repository {
 	// *******************************************************************************
 	
 	private static InputStream findXml(URI baseUri, String baseName) throws IOException, CompressorException {
-		URI xml = URI.create(String.join("/", baseUri.toString(), baseName + ".xml")); //$NON-NLS-1$
+		URI xml = URI.create(P2Util.concatPath('/', baseUri.toString(), baseName + ".xml")); //$NON-NLS-1$
 		try {
 			Optional<InputStream> result = P2Util.openConnection(xml);
 			if(result.isPresent()) {
@@ -125,7 +125,7 @@ public class P2Repository {
 			// Plain XML not present
 		}
 		
-		URI xz = URI.create(String.join("/", baseUri.toString(), baseName + ".xml.xz")); //$NON-NLS-1$
+		URI xz = URI.create(P2Util.concatPath('/', baseUri.toString(), baseName + ".xml.xz")); //$NON-NLS-1$
 		try {
 			Optional<InputStream> result = P2Util.openConnection(xz);
 			if(result.isPresent()) {
@@ -135,7 +135,7 @@ public class P2Repository {
 			// XZ-compressed XML not present
 		}
 		
-		URI jar = URI.create(String.join("/", baseUri.toString(), baseName + ".jar")); //$NON-NLS-1$
+		URI jar = URI.create(P2Util.concatPath('/', baseUri.toString(), baseName + ".jar")); //$NON-NLS-1$
 		try {
 			Optional<InputStream> result = P2Util.openConnection(jar);
 			if(result.isPresent()) {
