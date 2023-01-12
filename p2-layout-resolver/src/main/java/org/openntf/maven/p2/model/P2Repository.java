@@ -38,9 +38,6 @@ import org.openntf.maven.p2.util.P2Util;
 import org.openntf.maven.p2.util.xml.XMLDocument;
 import org.xml.sax.SAXException;
 
-import com.ibm.commons.util.PathUtil;
-import com.ibm.commons.util.io.StreamUtil;
-
 /**
  * Represents a local or remote P2 repository root.
  * 
@@ -84,7 +81,9 @@ public class P2Repository {
 							.map(P2Repository::getBundles)
 							.forEach(this.bundles::addAll);
 					} finally {
-						StreamUtil.close(compositeArtifacts);
+						if (compositeArtifacts != null) {
+							compositeArtifacts.close();
+						}
 					}
 				}
 				
@@ -94,7 +93,9 @@ public class P2Repository {
 					try {
 						collectBundles(artifactsXml, this.bundles, this.uri);
 					} finally {
-						StreamUtil.close(artifactsXml);
+						if (artifactsXml != null) {
+							artifactsXml.close();
+						}
 					}
 				}
 			} catch(SAXException e) {
@@ -114,7 +115,7 @@ public class P2Repository {
 	// *******************************************************************************
 	
 	private static InputStream findXml(URI baseUri, String baseName) throws IOException, CompressorException {
-		URI xml = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".xml", '/')); //$NON-NLS-1$
+		URI xml = URI.create(String.join("/", baseUri.toString(), baseName + ".xml")); //$NON-NLS-1$
 		try {
 			Optional<InputStream> result = P2Util.openConnection(xml);
 			if(result.isPresent()) {
@@ -124,7 +125,7 @@ public class P2Repository {
 			// Plain XML not present
 		}
 		
-		URI xz = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".xml.xz", '/')); //$NON-NLS-1$
+		URI xz = URI.create(String.join("/", baseUri.toString(), baseName + ".xml.xz")); //$NON-NLS-1$
 		try {
 			Optional<InputStream> result = P2Util.openConnection(xz);
 			if(result.isPresent()) {
@@ -134,7 +135,7 @@ public class P2Repository {
 			// XZ-compressed XML not present
 		}
 		
-		URI jar = URI.create(PathUtil.concat(baseUri.toString(), baseName + ".jar", '/')); //$NON-NLS-1$
+		URI jar = URI.create(String.join("/", baseUri.toString(), baseName + ".jar")); //$NON-NLS-1$
 		try {
 			Optional<InputStream> result = P2Util.openConnection(jar);
 			if(result.isPresent()) {

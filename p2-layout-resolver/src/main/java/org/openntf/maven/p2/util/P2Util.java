@@ -23,7 +23,7 @@ import java.net.URI;
 import java.net.URLConnection;
 import java.util.Optional;
 
-import com.ibm.commons.util.StringUtil;
+import org.apache.commons.lang3.StringUtils;
 
 public enum P2Util {
 	;
@@ -41,7 +41,7 @@ public enum P2Util {
 				case 308:
 					// Try handling a redirect
 					String location = ((HttpURLConnection)conn).getHeaderField("Location"); //$NON-NLS-1$
-					if(StringUtil.isNotEmpty(location)) {
+					if(StringUtils.isNotEmpty(location)) {
 						return openConnection(uri.resolve(location));
 					} else {
 						return Optional.empty();
