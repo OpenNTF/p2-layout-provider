@@ -26,7 +26,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
-import com.ibm.commons.util.StringUtil;
+import org.apache.commons.lang3.StringUtils;
 
 /**
  * Basic representation of a bundle manifest from a provided {@link Path}, including
@@ -56,13 +56,13 @@ public class P2BundleManifest {
 			
 			// Check for a Bundle-Localization header
 			String locHeader = this.manifest.getMainAttributes().getValue("Bundle-Localization"); //$NON-NLS-1$
-			if(StringUtil.isEmpty(locHeader)) {
+			if(StringUtils.isEmpty(locHeader)) {
 				locHeader = "OSGI-INF/l10n/bundle"; // default when not otherwise specified //$NON-NLS-1$
 			}
 			Set<String> localeVariants = buildLocaleVariants();
 			for(String locale : localeVariants) {
 				String entryName;
-				if(StringUtil.isEmpty(locale)) {
+				if(StringUtils.isEmpty(locale)) {
 					entryName = locHeader + ".properties"; //$NON-NLS-1$
 				} else {
 					entryName = locHeader + "_" + locale + ".properties"; //$NON-NLS-1$ //$NON-NLS-2$
@@ -85,7 +85,7 @@ public class P2BundleManifest {
 	
 	public String get(String headerName) {
 		String headerValue = this.manifest.getMainAttributes().getValue(headerName);
-		if(StringUtil.isNotEmpty(headerValue) && headerValue.startsWith("%") && headerValue.length() > 1) { //$NON-NLS-1$
+		if(StringUtils.isNotEmpty(headerValue) && headerValue.startsWith("%") && headerValue.length() > 1) { //$NON-NLS-1$
 			String localeProp = headerValue.substring(1);
 			return this.localization.getProperty(localeProp, localeProp);
 		} else {

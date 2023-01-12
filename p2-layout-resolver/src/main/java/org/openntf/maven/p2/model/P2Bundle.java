@@ -20,9 +20,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.openntf.maven.p2.util.xml.XMLNode;
-
-import com.ibm.commons.util.StringUtil;
 
 /**
  * Represents a bundle entry inside of a P2 repository, based on the containing
@@ -77,7 +76,7 @@ public class P2Bundle {
 		result.append(this.id);
 		if("sources".equals(classifier)) { //$NON-NLS-1$
 			result.append(".source"); //$NON-NLS-1$
-		} else if(StringUtil.isNotEmpty(classifier)) {
+		} else if(StringUtils.isNotEmpty(classifier)) {
 			result.append('.');
 			result.append(classifier);
 		}

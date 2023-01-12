@@ -62,9 +62,9 @@
 		
 		<!-- General utilities -->
 		<dependency>
-			<groupId>com.ibm.sbt</groupId>
-			<artifactId>com.ibm.commons</artifactId>
-			<version>9.0.0</version>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-lang3</artifactId>
+			<version>3.12.0</version>
 		</dependency>
 		
 		<!-- OSGi processing -->
