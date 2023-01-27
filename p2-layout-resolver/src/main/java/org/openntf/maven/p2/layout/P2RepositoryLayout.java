@@ -1,5 +1,5 @@
 /**
- * Copyright © 2019-2023 Jesse Gallagher
+ * Copyright © 2019-2023 Contributors to the P2 Layout Resolver Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ import java.util.zip.ZipFile;
 
 import javax.xml.parsers.ParserConfigurationException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.metadata.Metadata;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
@@ -55,8 +56,6 @@ import org.osgi.framework.BundleException;
 import org.osgi.framework.Version;
 import org.osgi.framework.VersionRange;
 import org.xml.sax.SAXException;
-
-import com.ibm.commons.util.StringUtil;
 
 public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private final Logger log;
@@ -102,7 +101,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		}
 		case "jar": { //$NON-NLS-1$
 			// Check for classifier
-			switch(StringUtil.toString(artifact.getClassifier())) {
+			switch(StringUtils.defaultString(artifact.getClassifier())) {
 			case "sources": { //$NON-NLS-1$
 				return findBundle(artifact.getArtifactId(), artifact.getVersion())
 					.map(bundle -> bundle.getUri("source")) //$NON-NLS-1$
@@ -162,7 +161,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			return null;
 		}
 		return this.checksums.computeIfAbsent(artifact, key -> {
-			if(!"jar".equals(key.getExtension()) || StringUtil.isNotEmpty(artifact.getClassifier())) { //$NON-NLS-1$
+			if(!"jar".equals(key.getExtension()) || StringUtils.isNotEmpty(artifact.getClassifier())) { //$NON-NLS-1$
 				return Collections.emptyList();
 			}
 			
@@ -293,36 +292,36 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private static void addBundleMetadata(XMLNode project, P2BundleManifest manifest) {
 		XMLDocument xml = project.getOwnerDocument();
 		String bundleName = manifest.get("Bundle-Name"); //$NON-NLS-1$
-		if(StringUtil.isNotEmpty(bundleName)) {
+		if(StringUtils.isNotEmpty(bundleName)) {
 			project.addChildElement("name").setTextContent(bundleName); //$NON-NLS-1$
 		}
 		String bundleDescription = manifest.get("Bundle-Description"); //$NON-NLS-1$
-		if(StringUtil.isNotEmpty(bundleDescription)) {
+		if(StringUtils.isNotEmpty(bundleDescription)) {
 			project.addChildElement("description").setTextContent(bundleDescription); //$NON-NLS-1$
 		}
 		String bundleLicense = manifest.get("Bundle-License"); //$NON-NLS-1$
-		if(StringUtil.isNotEmpty(bundleLicense)) {
+		if(StringUtils.isNotEmpty(bundleLicense)) {
 			XMLNode licenses = project.addChildElement("licenses"); //$NON-NLS-1$
 			XMLNode license = licenses.addChildElement("license"); //$NON-NLS-1$
 			license.addChildElement("url").setTextContent(bundleLicense); //$NON-NLS-1$
 		}
 		String bundleVendor = manifest.get("Bundle-Vendor"); //$NON-NLS-1$
-		if(StringUtil.isNotEmpty(bundleVendor)) {
+		if(StringUtils.isNotEmpty(bundleVendor)) {
 			XMLNode organization = project.addChildElement("organization"); //$NON-NLS-1$
 			organization.addChildElement("name").setTextContent(bundleVendor); //$NON-NLS-1$
 		}
 		String bundleCopyright = manifest.get("Bundle-Copyright"); //$NON-NLS-1$
-		if(StringUtil.isNotEmpty(bundleCopyright)) {
+		if(StringUtils.isNotEmpty(bundleCopyright)) {
 			project.appendChild(xml.createComment(MessageFormat.format(Messages.getString("P2RepositoryLayout.copyrightComment"), bundleCopyright))); //$NON-NLS-1$
 		}
 		String bundleDocUrl = manifest.get("Bundle-DocURL"); //$NON-NLS-1$
-		if(StringUtil.isNotEmpty(bundleDocUrl)) {
+		if(StringUtils.isNotEmpty(bundleDocUrl)) {
 			project.addChildElement("url").setTextContent(bundleDocUrl); //$NON-NLS-1$
 		}
 		String sourceRef = manifest.get("Eclipse-SourceReferences"); //$NON-NLS-1$
-		if(StringUtil.isNotEmpty(sourceRef)) {
+		if(StringUtils.isNotEmpty(sourceRef)) {
 			// Only use the first
-			sourceRef = StringUtil.splitString(sourceRef, ',')[0];
+			sourceRef = StringUtils.split(sourceRef, ',')[0];
 			XMLNode scm = project.addChildElement("scm"); //$NON-NLS-1$
 			scm.addChildElement("url").setTextContent(sourceRef); //$NON-NLS-1$
 		}
@@ -332,17 +331,17 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		XMLNode dependencies = null;
 		
 		String requireBundle = manifest.get("Require-Bundle"); //$NON-NLS-1$
-		if(StringUtil.isNotEmpty(requireBundle)) {
+		if(StringUtils.isNotEmpty(requireBundle)) {
 			dependencies = project.addChildElement("dependencies"); //$NON-NLS-1$
 			
 			try {
 				for(ManifestElement el : ManifestElement.parseHeader("Require-Bundle", requireBundle)) { //$NON-NLS-1$
 					String bundleName = el.getValue();
 					String v = el.getAttribute("bundle-version"); //$NON-NLS-1$
-					VersionRange versionRange = StringUtil.isEmpty(v) ? null : new VersionRange(v);
+					VersionRange versionRange = StringUtils.isEmpty(v) ? null : new VersionRange(v);
 					
 					P2Bundle dep = this.p2Repo.getBundles().stream()
-						.filter(bundle -> StringUtil.equals(bundleName, bundle.getId()))
+						.filter(bundle -> StringUtils.equals(bundleName, bundle.getId()))
 						.filter(bundle -> versionRange == null || versionRange.includes(new Version(bundle.getVersion())))
 						.findFirst()
 						.orElse(null);
@@ -361,14 +360,14 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 		Path localJar = getLocalJar(artifact, true).orElse(null);
 		if(localJar != null) {
 			String bundleClassPath = manifest.get("Bundle-ClassPath"); //$NON-NLS-1$
-			if(StringUtil.isNotEmpty(bundleClassPath)) {
+			if(StringUtils.isNotEmpty(bundleClassPath)) {
 				if(dependencies == null) {
 					dependencies = project.addChildElement("dependencies"); //$NON-NLS-1$
 				}
 				try {
 					for(ManifestElement el : ManifestElement.parseHeader("Bundle-ClassPath", bundleClassPath)) { //$NON-NLS-1$
 						String cpName = el.getValue();
-						if(StringUtil.isEmpty(cpName) || ".".equals(cpName)) { //$NON-NLS-1$
+						if(StringUtils.isEmpty(cpName) || ".".equals(cpName)) { //$NON-NLS-1$
 							continue;
 						}
 						
@@ -436,13 +435,13 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	
 	private List<P2Bundle> findBundles(String artifactId) {
 		return this.p2Repo.getBundles().stream()
-			.filter(bundle -> StringUtil.equals(bundle.getId(), artifactId))
+			.filter(bundle -> StringUtils.equals(bundle.getId(), artifactId))
 			.collect(Collectors.toList());
 	}
 	
 	private Optional<P2Bundle> findBundle(String artifactId, String version) {
 		return this.p2Repo.getBundles().stream()
-			.filter(bundle -> StringUtil.equals(bundle.getId(), artifactId))
+			.filter(bundle -> StringUtils.equals(bundle.getId(), artifactId))
 			.filter(bundle -> version == null || version.equals(bundle.getVersion()))
 			.findFirst();
 	}
@@ -470,7 +469,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private String toFileName(Artifact artifact, boolean ignoreClassifier) {
 		StringBuilder builder = new StringBuilder();
 		builder.append(artifact.getArtifactId());
-		if(!ignoreClassifier && StringUtil.isNotEmpty(artifact.getClassifier())) {
+		if(!ignoreClassifier && StringUtils.isNotEmpty(artifact.getClassifier())) {
 			builder.append("."); //$NON-NLS-1$
 			if("sources".equals(artifact.getClassifier())) { //$NON-NLS-1$
 				builder.append("source"); //$NON-NLS-1$

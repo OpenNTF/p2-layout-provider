@@ -1,5 +1,5 @@
 /**
- * Copyright © 2019-2023 Jesse Gallagher
+ * Copyright © 2019-2023 Contributors to the P2 Layout Resolver Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.spi.connector.ArtifactDownload;
@@ -51,8 +52,6 @@ import org.eclipse.aether.transfer.MetadataTransferException;
 import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.layout.P2RepositoryLayout;
 import org.openntf.maven.p2.util.P2Util;
-
-import com.ibm.commons.util.StringUtil;
 
 public class P2RepositoryConnector implements RepositoryConnector {
 	private final Logger log;
@@ -199,7 +198,7 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			String checksum = new String(Files.readAllBytes(checksumPath));
 			DigestUtils digest = new DigestUtils(algorithm);
 			String fileChecksum = digest.digestAsHex(artifactPath.toFile());
-			if(!StringUtil.equals(checksum, fileChecksum)) {
+			if(!StringUtils.equals(checksum, fileChecksum)) {
 				throw new ChecksumFailureException(MessageFormat.format(
 						Messages.getString("P2RepositoryConnector.checksumMismatch"), artifactPath, //$NON-NLS-1$
 						algorithm, checksum, fileChecksum));

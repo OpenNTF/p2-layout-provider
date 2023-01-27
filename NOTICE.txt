@@ -1,0 +1,9 @@
+P2 Maven Resolver
+Copyright 2019-2023 Jesse Gallagher and others
+https://github.com/OpenNTF/p2-layout-provider/graphs/contributors
+
+This product is licensed under the terms of the Apache 2.0 license.
+
+The project contains the following third-party code:
+
+1) Portions of IBM Commons, available from https://github.com/OpenNTF/SocialSDK and licensed under the Apache 2.0 license
