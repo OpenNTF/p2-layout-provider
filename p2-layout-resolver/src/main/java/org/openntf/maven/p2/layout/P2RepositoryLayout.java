@@ -150,7 +150,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayout.getLocationMetadata"), metadata)); //$NON-NLS-1$
 		}
 		if(this.p2Repo == null) {
-			return null;
+			return fakeUri();
 		}
 		
 		return getMetadata(metadata).toUri();
@@ -159,7 +159,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	@Override
 	public List<Checksum> getChecksums(Artifact artifact, boolean upload, URI location) {
 		if(this.p2Repo == null) {
-			return null;
+			return Collections.emptyList();
 		}
 		return this.checksums.computeIfAbsent(artifact, key -> {
 			if(!"jar".equals(key.getExtension()) || StringUtils.isNotEmpty(artifact.getClassifier())) { //$NON-NLS-1$
