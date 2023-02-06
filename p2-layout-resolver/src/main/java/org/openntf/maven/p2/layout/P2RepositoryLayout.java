@@ -92,7 +92,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayout.getLocationArtifact"), artifact)); //$NON-NLS-1$
 		}
 		if(this.p2Repo == null) {
-			return null;
+			return fakeUri();
 		}
 		
 		switch(String.valueOf(artifact.getExtension())) {
@@ -138,9 +138,9 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			}
 			}
 		}
+		default:
+			return fakeUri();
 		}
-		
-		return null;
 	}
 
 	@Override
@@ -448,8 +448,8 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	
 	private Optional<Path> getLocalJar(Artifact artifact, boolean ignoreClassifier) {
 		return findBundle(artifact.getArtifactId(), artifact.getVersion())
-			.map(bundle -> {
-				return localJars.computeIfAbsent(bundle, key -> {
+			.flatMap(bundle -> {
+				return Optional.ofNullable(localJars.computeIfAbsent(bundle, key -> {
 					String jar = toFileName(artifact, ignoreClassifier);
 					
 					URI uri = bundle.getUri(ignoreClassifier ? null : artifact.getClassifier());
@@ -472,7 +472,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						return null;
 					}
 					
-				});
+				}));
 			});
 	}
 	
