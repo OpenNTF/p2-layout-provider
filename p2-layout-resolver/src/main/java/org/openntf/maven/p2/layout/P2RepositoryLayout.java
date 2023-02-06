@@ -16,7 +16,6 @@
 package org.openntf.maven.p2.layout;
 
 import java.io.Closeable;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
@@ -50,6 +49,7 @@ import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.model.P2Bundle;
 import org.openntf.maven.p2.model.P2BundleManifest;
 import org.openntf.maven.p2.model.P2Repository;
+import org.openntf.maven.p2.util.P2Util;
 import org.openntf.maven.p2.util.xml.XMLDocument;
 import org.openntf.maven.p2.util.xml.XMLNode;
 import org.osgi.framework.BundleException;
@@ -452,16 +452,26 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				return localJars.computeIfAbsent(bundle, key -> {
 					String jar = toFileName(artifact, ignoreClassifier);
 					
-					try(InputStream is = bundle.getUri(ignoreClassifier ? null : artifact.getClassifier()).toURL().openStream()) {
-						Path localJar = this.metadataScratch.resolve(jar);
-						Files.copy(is, localJar, StandardCopyOption.REPLACE_EXISTING);
-						return localJar;
-					} catch(FileNotFoundException e) {
-						// 404
-						return null;
+					URI uri = bundle.getUri(ignoreClassifier ? null : artifact.getClassifier());
+					try {
+						Optional<InputStream> optIs = P2Util.openConnection(uri);
+						if(optIs.isPresent()) {
+							try(InputStream is = optIs.get()) {
+								Path localJar = this.metadataScratch.resolve(jar);
+								Files.copy(is, localJar, StandardCopyOption.REPLACE_EXISTING);
+								return localJar;
+							}
+						} else {
+							return null;
+						}
 					} catch(IOException e) {
-						throw new RuntimeException(e);
+						if(log.isWarnEnabled()) {
+							log.warn("Encountered exception reading " + uri, e);
+							throw new RuntimeException(e);
+						}
+						return null;
 					}
+					
 				});
 			});
 	}
