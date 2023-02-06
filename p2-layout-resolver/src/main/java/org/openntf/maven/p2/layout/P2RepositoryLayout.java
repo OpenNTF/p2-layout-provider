@@ -18,6 +18,7 @@ package org.openntf.maven.p2.layout;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -131,7 +132,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 							return URI.create("jar:" + localJar.toUri().toString() + "!/" + classifiedEntry.getName()); //$NON-NLS-1$ //$NON-NLS-2$
 						}
 					} catch (IOException e) {
-						throw new RuntimeException(e);
+						throw new UncheckedIOException("Encountered exception reading local file " + localJar, e);
 					}
 				}
 				return fakeUri();
@@ -170,14 +171,14 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				return bundle.getProperties().entrySet().stream()
 					.filter(entry -> String.valueOf(entry.getKey()).startsWith("download.checksum.")) //$NON-NLS-1$
 					.map(property -> {
+						String algorithm = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
+						String value = property.getValue();
+						Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
 						try {
-							String algorithm = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
-							String value = property.getValue();
-							Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
 							Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 							return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
 						} catch(IOException e) {
-							throw new RuntimeException(e);
+							throw new UncheckedIOException("Encountered exception writing to local file " + checksumFile, e);
 						}
 					})
 					.collect(Collectors.toList());
@@ -282,7 +283,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						}
 					}
 				} catch(IOException | SAXException | ParserConfigurationException e) {
-					throw new RuntimeException(e);
+					throw new RuntimeException("Encountered exception writing to local pom " + pomOut, e);
 				}
 			}
 			return pomOut;
@@ -353,7 +354,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 					}
 				}
 			} catch (BundleException e) {
-				throw new RuntimeException(e);
+				throw new RuntimeException("Encountered exception processing bundle manifest for " + artifact, e);
 			}
 		}
 
@@ -382,7 +383,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						dependency.addChildElement("classifier").setTextContent(cleanClassifier(cpName)); //$NON-NLS-1$
 					}
 				} catch (BundleException e) {
-					throw new RuntimeException(e);
+					throw new RuntimeException("Encountered exception processing bundle manifest for " + artifact, e);
 				}
 			}
 		}
@@ -425,7 +426,6 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						}
 					}
 				} catch(Throwable e) {
-					e.printStackTrace();
 					throw new RuntimeException(e);
 				}
 			}
