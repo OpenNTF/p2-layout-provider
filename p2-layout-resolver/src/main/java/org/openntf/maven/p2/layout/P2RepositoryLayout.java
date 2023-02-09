@@ -16,9 +16,9 @@
 package org.openntf.maven.p2.layout;
 
 import java.io.Closeable;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -50,6 +50,7 @@ import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.model.P2Bundle;
 import org.openntf.maven.p2.model.P2BundleManifest;
 import org.openntf.maven.p2.model.P2Repository;
+import org.openntf.maven.p2.util.P2Util;
 import org.openntf.maven.p2.util.xml.XMLDocument;
 import org.openntf.maven.p2.util.xml.XMLNode;
 import org.osgi.framework.BundleException;
@@ -92,7 +93,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayout.getLocationArtifact"), artifact)); //$NON-NLS-1$
 		}
 		if(this.p2Repo == null) {
-			return null;
+			return fakeUri();
 		}
 		
 		switch(String.valueOf(artifact.getExtension())) {
@@ -131,16 +132,16 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 							return URI.create("jar:" + localJar.toUri().toString() + "!/" + classifiedEntry.getName()); //$NON-NLS-1$ //$NON-NLS-2$
 						}
 					} catch (IOException e) {
-						throw new RuntimeException(e);
+						throw new UncheckedIOException("Encountered exception reading local file " + localJar, e);
 					}
 				}
 				return fakeUri();
 			}
 			}
 		}
+		default:
+			return fakeUri();
 		}
-		
-		return null;
 	}
 
 	@Override
@@ -149,7 +150,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			log.debug(MessageFormat.format(Messages.getString("P2RepositoryLayout.getLocationMetadata"), metadata)); //$NON-NLS-1$
 		}
 		if(this.p2Repo == null) {
-			return null;
+			return fakeUri();
 		}
 		
 		return getMetadata(metadata).toUri();
@@ -158,7 +159,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	@Override
 	public List<Checksum> getChecksums(Artifact artifact, boolean upload, URI location) {
 		if(this.p2Repo == null) {
-			return null;
+			return Collections.emptyList();
 		}
 		return this.checksums.computeIfAbsent(artifact, key -> {
 			if(!"jar".equals(key.getExtension()) || StringUtils.isNotEmpty(artifact.getClassifier())) { //$NON-NLS-1$
@@ -170,14 +171,14 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				return bundle.getProperties().entrySet().stream()
 					.filter(entry -> String.valueOf(entry.getKey()).startsWith("download.checksum.")) //$NON-NLS-1$
 					.map(property -> {
+						String algorithm = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
+						String value = property.getValue();
+						Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
 						try {
-							String algorithm = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
-							String value = property.getValue();
-							Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
 							Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 							return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
 						} catch(IOException e) {
-							throw new RuntimeException(e);
+							throw new UncheckedIOException("Encountered exception writing to local file " + checksumFile, e);
 						}
 					})
 					.collect(Collectors.toList());
@@ -282,7 +283,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						}
 					}
 				} catch(IOException | SAXException | ParserConfigurationException e) {
-					throw new RuntimeException(e);
+					throw new RuntimeException("Encountered exception writing to local pom " + pomOut, e);
 				}
 			}
 			return pomOut;
@@ -353,7 +354,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 					}
 				}
 			} catch (BundleException e) {
-				throw new RuntimeException(e);
+				throw new RuntimeException("Encountered exception processing bundle manifest for " + artifact, e);
 			}
 		}
 
@@ -382,7 +383,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						dependency.addChildElement("classifier").setTextContent(cleanClassifier(cpName)); //$NON-NLS-1$
 					}
 				} catch (BundleException e) {
-					throw new RuntimeException(e);
+					throw new RuntimeException("Encountered exception processing bundle manifest for " + artifact, e);
 				}
 			}
 		}
@@ -425,7 +426,6 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 						}
 					}
 				} catch(Throwable e) {
-					e.printStackTrace();
 					throw new RuntimeException(e);
 				}
 			}
@@ -448,21 +448,31 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	
 	private Optional<Path> getLocalJar(Artifact artifact, boolean ignoreClassifier) {
 		return findBundle(artifact.getArtifactId(), artifact.getVersion())
-			.map(bundle -> {
-				return localJars.computeIfAbsent(bundle, key -> {
+			.flatMap(bundle -> {
+				return Optional.ofNullable(localJars.computeIfAbsent(bundle, key -> {
 					String jar = toFileName(artifact, ignoreClassifier);
 					
-					try(InputStream is = bundle.getUri(ignoreClassifier ? null : artifact.getClassifier()).toURL().openStream()) {
-						Path localJar = this.metadataScratch.resolve(jar);
-						Files.copy(is, localJar, StandardCopyOption.REPLACE_EXISTING);
-						return localJar;
-					} catch(FileNotFoundException e) {
-						// 404
-						return null;
+					URI uri = bundle.getUri(ignoreClassifier ? null : artifact.getClassifier());
+					try {
+						Optional<InputStream> optIs = P2Util.openConnection(uri);
+						if(optIs.isPresent()) {
+							try(InputStream is = optIs.get()) {
+								Path localJar = this.metadataScratch.resolve(jar);
+								Files.copy(is, localJar, StandardCopyOption.REPLACE_EXISTING);
+								return localJar;
+							}
+						} else {
+							return null;
+						}
 					} catch(IOException e) {
-						throw new RuntimeException(e);
+						if(log.isWarnEnabled()) {
+							log.warn("Encountered exception reading " + uri, e);
+							throw new RuntimeException(e);
+						}
+						return null;
 					}
-				});
+					
+				}));
 			});
 	}
 	

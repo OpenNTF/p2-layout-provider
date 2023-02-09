@@ -54,13 +54,6 @@ public class XMLDocument extends XMLNode {
 		return new XMLNode(((Document) node_).getDocumentElement());
 	}
 
-	public void loadURL(final String urlString) throws SAXException, IOException, ParserConfigurationException {
-		URL url = new URL(urlString);
-		URLConnection conn = url.openConnection();
-
-		node_ = getBuilder().parse((InputStream) conn.getContent());
-	}
-
 	public void loadInputStream(final InputStream is) throws SAXException, IOException, ParserConfigurationException {
 		node_ = getBuilder().parse(is);
 	}
