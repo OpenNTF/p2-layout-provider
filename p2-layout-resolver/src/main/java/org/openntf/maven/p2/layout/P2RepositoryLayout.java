@@ -28,10 +28,12 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.text.MessageFormat;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -43,8 +45,9 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.metadata.Metadata;
+import org.eclipse.aether.spi.connector.checksum.ChecksumAlgorithmFactory;
+import org.eclipse.aether.spi.connector.checksum.ChecksumAlgorithmFactorySelector;
 import org.eclipse.aether.spi.connector.layout.RepositoryLayout;
-import org.eclipse.aether.spi.log.Logger;
 import org.eclipse.osgi.util.ManifestElement;
 import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.model.P2Bundle;
@@ -56,23 +59,28 @@ import org.openntf.maven.p2.util.xml.XMLNode;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Version;
 import org.osgi.framework.VersionRange;
+import org.slf4j.Logger;
 import org.xml.sax.SAXException;
 
 public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	private final Logger log;
 
-	private String id;
+	private final String id;
 	private final P2Repository p2Repo;
+
+	private final ChecksumAlgorithmFactorySelector checksumAlgorithmFactorySelector;
+
 	private Path metadataScratch;
 	
-	private Map<String, Path> poms = new HashMap<>();
-	private Map<String, Path> metadatas = new HashMap<>();
-	private Map<Artifact, List<Checksum>> checksums = new HashMap<>();
+	private final Map<String, Path> poms = new HashMap<>();
+	private final Map<String, Path> metadatas = new HashMap<>();
+	private Map<Artifact, List<ChecksumLocation>> checksums = new HashMap<>();
 	private Map<P2Bundle, Path> localJars = new HashMap<>();
 
-	public P2RepositoryLayout(String id, String url, Logger log) throws IOException {
+	public P2RepositoryLayout(String id, String url, Logger log, ChecksumAlgorithmFactorySelector checksumAlgorithmFactorySelector) throws IOException {
 		this.id = id;
 		this.log = log;
+		this.checksumAlgorithmFactorySelector = checksumAlgorithmFactorySelector;
 		P2Repository repo;
 		try {
 			repo = P2Repository.getInstance(URI.create(url), log);
@@ -85,6 +93,18 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			repo = null;
 		}
 		this.p2Repo = repo;
+	}
+
+	@Override
+	public List<ChecksumAlgorithmFactory> getChecksumAlgorithmFactories() {
+		// TODO: unsure what checksums P2 uses, I guess it DOES use SHA-1
+		return checksumAlgorithmFactorySelector.selectList(Arrays.asList("SHA-1", "MD5"));
+	}
+
+	@Override
+	public boolean hasChecksums(Artifact artifact) {
+		// TODO: unsure how to decide this for P2
+		return true;
 	}
 
 	@Override
@@ -157,7 +177,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	}
 
 	@Override
-	public List<Checksum> getChecksums(Artifact artifact, boolean upload, URI location) {
+	public List<ChecksumLocation> getChecksumLocations(Artifact artifact, boolean upload, URI location) {
 		if(this.p2Repo == null) {
 			return Collections.emptyList();
 		}
@@ -171,12 +191,13 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				return bundle.getProperties().entrySet().stream()
 					.filter(entry -> String.valueOf(entry.getKey()).startsWith("download.checksum.")) //$NON-NLS-1$
 					.map(property -> {
-						String algorithm = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
+						String algorithmName = property.getKey().substring("download.checksum.".length()); //$NON-NLS-1$
+						ChecksumAlgorithmFactory algorithmFactory = checksumAlgorithmFactorySelector.select(algorithmName.toUpperCase(Locale.ROOT));
 						String value = property.getValue();
-						Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithm); //$NON-NLS-1$
+						Path checksumFile = metadataScratch.resolve(toFileName(artifact, true) + "." + algorithmFactory.getFileExtension()); //$NON-NLS-1$
 						try {
 							Files.write(checksumFile, value.getBytes(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-							return new Checksum(algorithm, URI.create(checksumFile.getFileName().toString()));
+							return new ChecksumLocation(URI.create(checksumFile.getFileName().toString()), algorithmFactory);
 						} catch(IOException e) {
 							throw new UncheckedIOException("Encountered exception writing to local file " + checksumFile, e);
 						}
@@ -188,7 +209,7 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 	}
 
 	@Override
-	public List<Checksum> getChecksums(Metadata metadata, boolean upload, URI location) {
+	public List<ChecksumLocation> getChecksumLocations(Metadata metadata, boolean upload, URI location) {
 		return Collections.emptyList();
 	}
 
@@ -217,8 +238,8 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				}
 			}
 		}
-		for(List<Checksum> cks : checksums.values()) {
-			for(Checksum checksum : cks) {
+		for(List<ChecksumLocation> cks : checksums.values()) {
+			for(ChecksumLocation checksum : cks) {
 				try {
 					Path path = this.metadataScratch.resolve(checksum.getLocation().toString());
 					Files.deleteIfExists(path);

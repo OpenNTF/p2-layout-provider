@@ -25,6 +25,7 @@ import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -33,7 +34,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
@@ -42,19 +42,26 @@ import org.eclipse.aether.spi.connector.ArtifactUpload;
 import org.eclipse.aether.spi.connector.MetadataDownload;
 import org.eclipse.aether.spi.connector.MetadataUpload;
 import org.eclipse.aether.spi.connector.RepositoryConnector;
-import org.eclipse.aether.spi.connector.layout.RepositoryLayout.Checksum;
-import org.eclipse.aether.spi.log.Logger;
+import org.eclipse.aether.spi.connector.checksum.ChecksumAlgorithmFactory;
+import org.eclipse.aether.spi.connector.checksum.ChecksumAlgorithmFactorySelector;
+import org.eclipse.aether.spi.connector.checksum.ChecksumAlgorithmHelper;
+import org.eclipse.aether.spi.connector.layout.RepositoryLayout.ChecksumLocation;
 import org.eclipse.aether.transfer.ArtifactNotFoundException;
 import org.eclipse.aether.transfer.ArtifactTransferException;
 import org.eclipse.aether.transfer.ChecksumFailureException;
 import org.eclipse.aether.transfer.MetadataNotFoundException;
 import org.eclipse.aether.transfer.MetadataTransferException;
+import org.eclipse.aether.transfer.TransferEvent;
+import org.eclipse.aether.transfer.TransferResource;
 import org.openntf.maven.p2.Messages;
 import org.openntf.maven.p2.layout.P2RepositoryLayout;
 import org.openntf.maven.p2.util.P2Util;
+import org.slf4j.Logger;
 
 public class P2RepositoryConnector implements RepositoryConnector {
 	private final Logger log;
+
+	private final RepositorySystemSession session;
 	
 	private final RemoteRepository repository;
 	private final P2RepositoryLayout layout;
@@ -62,12 +69,13 @@ public class P2RepositoryConnector implements RepositoryConnector {
 	private final ExecutorService executor = Executors.newSingleThreadExecutor();
 	private boolean closed;
 	
-	public P2RepositoryConnector(RepositorySystemSession session, RemoteRepository repository, Logger logger) {
+	public P2RepositoryConnector(RepositorySystemSession session, RemoteRepository repository, Logger logger, ChecksumAlgorithmFactorySelector checksumAlgorithmFactorySelector) {
+		this.session = session;
 		this.repository = repository;
 		this.log = logger;
 		try {
 			// TODO support auth
-			this.layout = new P2RepositoryLayout(repository.getId(), repository.getUrl(), log);
+			this.layout = new P2RepositoryLayout(repository.getId(), repository.getUrl(), log, checksumAlgorithmFactorySelector);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -89,24 +97,31 @@ public class P2RepositoryConnector implements RepositoryConnector {
 			if(artifactDownloads != null) {
 				artifactDownloads.stream()
 					.map(download -> (Callable<Void>)() -> {
+						TransferEvent.Builder builder = new TransferEvent.Builder(session, new TransferResource(repository.getId(), repository.getUrl(), download.getFile().getName(), download.getFile(), download.getTrace()) );
+						download.getListener().transferInitiated(builder.build());
+
 						Path dest = download.getFile().toPath();
 						URI sourceUri = layout.getLocation(download.getArtifact(), false);
 						if(sourceUri == null) {
 							return null;
 						}
 						try {
+							download.getListener().transferStarted(builder.build());
 							download(sourceUri, dest);
 							
-							for(Checksum checksum : layout.getChecksums(download.getArtifact(), false, sourceUri)) {
-								String ext = checksum.getAlgorithm().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
+							for(ChecksumLocation checksum : layout.getChecksumLocations(download.getArtifact(), false, sourceUri)) {
+								String ext = checksum.getChecksumAlgorithmFactory().getFileExtension(); //$NON-NLS-1$ //$NON-NLS-2$
 								Path checksumPath = dest.getParent().resolve(dest.getFileName().toString()+"."+ext); //$NON-NLS-1$
 								download(sourceUri.resolve(checksum.getLocation()), checksumPath);
 								
-								verifyChecksum(dest, checksumPath, checksum.getAlgorithm());
+								verifyChecksum(dest, checksumPath, checksum.getChecksumAlgorithmFactory());
+								download.getListener().transferSucceeded(builder.build());
 							}
 						} catch(FileNotFoundException e) {
+							download.getListener().transferFailed(builder.build());
 							download.setException(new ArtifactNotFoundException(download.getArtifact(), repository, Messages.getString("P2RepositoryConnector.artifactNotFound"), e)); //$NON-NLS-1$
 						} catch(Exception e) {
+							download.getListener().transferFailed(builder.build());
 							download.setException(new ArtifactTransferException(download.getArtifact(), repository, Messages.getString("P2RepositoryConnector.exceptionTransferringArtifact"), e)); //$NON-NLS-1$
 						}
 						return null;
@@ -193,11 +208,10 @@ public class P2RepositoryConnector implements RepositoryConnector {
 		}
 	}
 	
-	private void verifyChecksum(Path artifactPath, Path checksumPath, String algorithm) throws ChecksumFailureException {
+	private void verifyChecksum(Path artifactPath, Path checksumPath, ChecksumAlgorithmFactory algorithm) throws ChecksumFailureException {
 		try {
 			String checksum = new String(Files.readAllBytes(checksumPath));
-			DigestUtils digest = new DigestUtils(algorithm);
-			String fileChecksum = digest.digestAsHex(artifactPath.toFile());
+			String fileChecksum = ChecksumAlgorithmHelper.calculate(artifactPath.toFile(), Collections.singletonList(algorithm)).get(algorithm.getName());
 			if(!StringUtils.equals(checksum, fileChecksum)) {
 				throw new ChecksumFailureException(MessageFormat.format(
 						Messages.getString("P2RepositoryConnector.checksumMismatch"), artifactPath, //$NON-NLS-1$

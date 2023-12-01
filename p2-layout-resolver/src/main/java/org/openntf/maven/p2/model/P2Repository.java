@@ -33,9 +33,9 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.compress.compressors.CompressorException;
 import org.apache.commons.compress.compressors.CompressorStreamFactory;
-import org.eclipse.aether.spi.log.Logger;
 import org.openntf.maven.p2.util.P2Util;
 import org.openntf.maven.p2.util.xml.XMLDocument;
+import org.slf4j.Logger;
 import org.xml.sax.SAXException;
 
 /**
