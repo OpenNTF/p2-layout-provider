@@ -22,24 +22,21 @@ import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.spi.connector.RepositoryConnector;
 import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
-import org.eclipse.aether.spi.log.Logger;
-import org.eclipse.aether.spi.log.LoggerFactory;
-import org.eclipse.aether.spi.log.NullLoggerFactory;
+import org.eclipse.aether.spi.connector.checksum.ChecksumAlgorithmFactorySelector;
 import org.eclipse.aether.transfer.NoRepositoryConnectorException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Named("p2repo")
 public class P2RepositoryConnectorFactory implements RepositoryConnectorFactory {
 
-    private Logger logger = NullLoggerFactory.LOGGER;
-    
-	
-	public P2RepositoryConnectorFactory() {
-		
-	}
-	
+    private final Logger logger = LoggerFactory.getLogger(getClass());
+
+	private final ChecksumAlgorithmFactorySelector checksumAlgorithmFactorySelector;
+
 	@Inject
-	public P2RepositoryConnectorFactory(LoggerFactory loggerFactory) {
-		this.logger = loggerFactory.getLogger(getClass().getPackage().getName());
+	public P2RepositoryConnectorFactory(ChecksumAlgorithmFactorySelector checksumAlgorithmFactorySelector) {
+		this.checksumAlgorithmFactorySelector = checksumAlgorithmFactorySelector;
 	}
 
 	@Override
@@ -48,7 +45,7 @@ public class P2RepositoryConnectorFactory implements RepositoryConnectorFactory 
 		if(!"p2".equals(repository.getContentType())) { //$NON-NLS-1$
 			throw new NoRepositoryConnectorException(repository);
 		}
-		return new P2RepositoryConnector(session, repository, logger);
+		return new P2RepositoryConnector(session, repository, logger, checksumAlgorithmFactorySelector);
 	}
 
 	@Override
