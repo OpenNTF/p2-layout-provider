@@ -31,6 +31,11 @@
 			<url>https://download.eclipse.org/wildwebdeveloper/releases/0.8.0/</url>
 			<layout>p2</layout>
 		</repository>
+		<repository>
+			<id>org.eclipse.birt</id>
+			<url>https://download.eclipse.org/birt/updates/release/4.15.0</url>
+			<layout>p2</layout>
+		</repository>
 	</repositories>
 
 	<dependencies>
@@ -48,6 +53,11 @@
 			<groupId>org.eclipse.wildwebdeveloper.p2.repo</groupId>
 			<artifactId>org.eclipse.wildwebdeveloper.xml</artifactId>
 			<version>[0.5.0,)</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.birt</groupId>
+			<artifactId>org.eclipse.birt.report.engine</artifactId>
+			<version>[4.15.0,)</version>
 		</dependency>
 		<dependency>
 			<groupId>io.quarkus.platform</groupId>
