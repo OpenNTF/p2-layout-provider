@@ -389,10 +389,10 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 				try {
 					for(ManifestElement el : ManifestElement.parseHeader("Bundle-ClassPath", bundleClassPath)) { //$NON-NLS-1$
 						String cpName = el.getValue();
-						if(StringUtils.isEmpty(cpName) || ".".equals(cpName)) { //$NON-NLS-1$
+						if(StringUtils.isEmpty(cpName) || ".".equals(cpName) || !containsJarEntry(localJar, cpName)) { //$NON-NLS-1$
 							continue;
 						}
-						
+
 						if(cpName.toLowerCase().endsWith(".jar")) { //$NON-NLS-1$
 							cpName = cpName.substring(0, cpName.length()-4);
 						}
@@ -409,7 +409,16 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 			}
 		}
 	}
-	
+
+	private boolean containsJarEntry(Path localJar, String fileName) {
+		try(ZipFile jarFile = new ZipFile(localJar.toFile())) {
+			ZipEntry classifiedEntry = jarFile.getEntry(fileName);
+			return classifiedEntry != null;
+		} catch (IOException e) {
+			throw new UncheckedIOException("Encountered exception reading local file " + localJar, e);
+		}
+	}
+
 	private Path getMetadata(Metadata metadata) {
 		return this.metadatas.computeIfAbsent(metadata.getArtifactId(), key -> {
 			Path metadataOut = this.metadataScratch.resolve("maven-metadata-" + metadata.getArtifactId() + ".xml"); //$NON-NLS-1$ //$NON-NLS-2$
