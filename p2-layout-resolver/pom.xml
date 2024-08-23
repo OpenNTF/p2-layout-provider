@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.openntf.maven</groupId>
 	<artifactId>p2-layout-resolver</artifactId>
-	<version>1.8.0</version>
+	<version>1.9.0</version>
 	<packaging>maven-plugin</packaging>
 
 	<name>p2 Repository Resolver</name>
@@ -78,7 +78,7 @@
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-compress</artifactId>
-			<version>1.25.0</version>
+			<version>1.26.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.tukaani</groupId>
@@ -127,12 +127,12 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-assembly-plugin</artifactId>
-					<version>3.6.0</version>
+					<version>3.7.1</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-compiler-plugin</artifactId>
-					<version>3.11.0</version>
+					<version>3.13.0</version>
 					<configuration>
 						<proc>none</proc>
 					</configuration>
@@ -140,17 +140,17 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-deploy-plugin</artifactId>
-					<version>3.1.1</version>
+					<version>3.1.3</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-install-plugin</artifactId>
-					<version>3.1.1</version>
+					<version>3.1.3</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-jar-plugin</artifactId>
-					<version>3.3.0</version>
+					<version>3.4.2</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
@@ -160,7 +160,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-clean-plugin</artifactId>
-					<version>3.3.2</version>
+					<version>3.4.0</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
@@ -170,21 +170,22 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-site-plugin</artifactId>
-					<version>3.11.0</version>
+					<version>3.20.0</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-plugin-plugin</artifactId>
-					<version>3.10.2</version>
+					<version>3.14.0</version>
 					<configuration>
 						<skipErrorNoDescriptorsFound>true</skipErrorNoDescriptorsFound>
+						<goalPrefix>p2-layout-resolver</goalPrefix>
 					</configuration>
 				</plugin>
 			
 				<plugin>
 					<groupId>com.mycila</groupId>
 					<artifactId>license-maven-plugin</artifactId>
-					<version>4.3</version>
+					<version>4.5</version>
 					<configuration>
 						<aggregate>true</aggregate>
 						<header>license.txt</header>
@@ -197,7 +198,7 @@
 						</excludes>
 						<properties>
 							<owner>Contributors to the P2 Layout Resolver Project</owner>
-							<copyrightYear>2023</copyrightYear>
+							<copyrightYear>2024</copyrightYear>
 						</properties>
 						<mapping>
 							<tag>DYNASCRIPT_STYLE</tag>
@@ -255,7 +256,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
-				<version>3.3.0</version>
+				<version>3.3.1</version>
 				<executions>
 					<execution>
 						<id>attach-sources</id>
@@ -268,7 +269,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
-				<version>3.6.2</version>
+				<version>3.8.0</version>
 				<executions>
 					<execution>
 						<id>attach-javadocs</id>
@@ -282,7 +283,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-enforcer-plugin</artifactId>
-				<version>3.4.1</version>
+				<version>3.5.0</version>
 				<executions>
 					<execution>
 						<id>enforce-maven</id>
@@ -292,7 +293,7 @@
 						<configuration>
 							<rules>
 								<requireMavenVersion>
-									<version>3.2.5</version>
+									<version>3.6.3</version>
 								</requireMavenVersion>
 								<requireJavaVersion>
 									<version>${maven.compiler.target}</version>
