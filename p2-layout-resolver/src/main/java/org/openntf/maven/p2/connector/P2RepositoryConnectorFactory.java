@@ -1,5 +1,5 @@
-/**
- * Copyright © 2019-2023 Contributors to the P2 Layout Resolver Project
+/*
+ * Copyright © 2019-2024 Contributors to the P2 Layout Resolver Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
