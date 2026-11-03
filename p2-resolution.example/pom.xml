@@ -28,7 +28,7 @@
 		</repository>
 		<repository>
 			<id>org.eclipse.wildwebdeveloper.p2.repo</id>
-			<url>https://download.eclipse.org/wildwebdeveloper/releases/0.8.0/</url>
+			<url>https://archive.eclipse.org/wildwebdeveloper/releases/0.8.0/</url>
 			<layout>p2</layout>
 		</repository>
 		<repository>
