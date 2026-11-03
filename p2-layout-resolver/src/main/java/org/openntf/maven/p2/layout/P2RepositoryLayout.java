@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -72,10 +73,10 @@ public class P2RepositoryLayout implements RepositoryLayout, Closeable {
 
 	private Path metadataScratch;
 	
-	private final Map<String, Path> poms = new HashMap<>();
-	private final Map<String, Path> metadatas = new HashMap<>();
-	private Map<Artifact, List<ChecksumLocation>> checksums = new HashMap<>();
-	private Map<P2Bundle, Path> localJars = new HashMap<>();
+	private final Map<String, Path> poms = new ConcurrentHashMap<>();
+	private final Map<String, Path> metadatas = new ConcurrentHashMap<>();
+	private Map<Artifact, List<ChecksumLocation>> checksums = new ConcurrentHashMap<>();
+	private Map<P2Bundle, Path> localJars = new ConcurrentHashMap<>();
 
 	public P2RepositoryLayout(String id, String url, Logger log, ChecksumAlgorithmFactorySelector checksumAlgorithmFactorySelector) throws IOException {
 		this.id = id;
