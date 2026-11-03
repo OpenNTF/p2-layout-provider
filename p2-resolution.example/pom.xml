@@ -23,7 +23,7 @@
 	<repositories>
 		<repository>
 			<id>org.eclipse.p2.repo</id>
-			<url>http://download.eclipse.org/releases/2019-12</url>
+			<url>https://download.eclipse.org/releases/2019-12</url>
 			<layout>p2</layout>
 		</repository>
 		<repository>
